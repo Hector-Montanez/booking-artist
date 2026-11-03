@@ -92,6 +92,6 @@ Pruebas del servidor (sin internet ni llaves): `node vercel/test/pay.test.js`.
 
 ## Publicación web
 
-`web_build/` es la versión web ya compilada (`flutter build web --release --no-web-resources-cdn`)
-junto con las funciones de Vercel (`api/`). El proyecto de Vercel `booking-artist` publica esa carpeta.
-Para actualizarla: compilar, copiar `build/web/` a `web_build/` (sin borrar `api/` ni `package.json`) y hacer push.
+`web_build/` es la versión web ya compilada (`flutter build web --release --no-web-resources-cdn`).
+Vercel publica esa carpeta (ver `vercel.json`) y las funciones de `api/`, que son copia de `vercel/api/`.
+Para actualizarla: compilar, reemplazar `web_build/` con `build/web/` y hacer push a `main`.
