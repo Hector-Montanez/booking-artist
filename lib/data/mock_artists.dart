@@ -5,6 +5,12 @@ import '../models.dart';
 // Datos de ejemplo: artistas ficticios en Caguas, Puerto Rico. Los enlaces de video abren búsquedas
 // públicas de YouTube del género, porque estos artistas no existen.
 // En la versión real cada artista pegará los enlaces de sus propios perfiles.
+// Fotos inventadas para los perfiles de ejemplo: fotos libres de Unsplash
+// (Unsplash License, uso comercial gratis). Las personas en las fotos no son
+// los artistas; cuando un artista real se registre subirá las suyas.
+String _photo(String id) =>
+    'https://images.unsplash.com/$id?auto=format&fit=crop&w=900&q=70';
+
 String _yt(String q) =>
     'https://www.youtube.com/results?search_query=${Uri.encodeQueryComponent(q)}';
 
@@ -49,6 +55,8 @@ List<Artist> buildMockArtists() => [
   ),
   Artist(
     id: 'a1',
+    // Foto de ejemplo: Nick Karvounis / Unsplash.
+    photoUrl: _photo('photo-1474959783111-a0f551bdad25'),
     name: 'Sofía Rivera',
     category: ArtistCategory.solista,
     instruments: ['Cantante', 'Guitarrista'],
@@ -92,6 +100,8 @@ List<Artist> buildMockArtists() => [
   ),
   Artist(
     id: 'a2',
+    // Foto de ejemplo: Fábio Alves / Unsplash.
+    photoUrl: _photo('photo-1557787824-93666b9f6093'),
     name: 'DJ Nova',
     category: ArtistCategory.dj,
     genres: ['Reggaetón', 'House', 'Pop'],
@@ -139,6 +149,8 @@ List<Artist> buildMockArtists() => [
   ),
   Artist(
     id: 'a3',
+    // Foto de ejemplo: Diego Costa / Unsplash.
+    photoUrl: _photo('photo-1786027298157-0ff8a8d7f2df'),
     name: 'Los Del Barrio',
     category: ArtistCategory.agrupacion,
     genres: ['Salsa', 'Plena', 'Bomba'],
@@ -180,6 +192,8 @@ List<Artist> buildMockArtists() => [
   ),
   Artist(
     id: 'a4',
+    // Foto de ejemplo: Alex Zamora / Unsplash.
+    photoUrl: _photo('photo-1541804627596-3b5b9ef58c93'),
     name: 'Mateo Cruz Trío',
     category: ArtistCategory.agrupacion,
     genres: ['Jazz', 'Bossa nova', 'Lounge'],
@@ -210,6 +224,8 @@ List<Artist> buildMockArtists() => [
   ),
   Artist(
     id: 'a5',
+    // Foto de ejemplo: Richie Lugo / Unsplash.
+    photoUrl: _photo('photo-1483744463508-8680c28a0bbf'),
     name: 'Valeria Luna',
     category: ArtistCategory.solista,
     instruments: ['Cantante', 'Tecladista'],
@@ -240,6 +256,8 @@ List<Artist> buildMockArtists() => [
   ),
   Artist(
     id: 'a6',
+    // Foto de ejemplo: Krys Amon / Unsplash.
+    photoUrl: _photo('photo-1544785349-c4a5301826fd'),
     name: 'DJ Ritmo Latino',
     category: ArtistCategory.dj,
     genres: ['Salsa', 'Reggaetón', 'Clásicos'],
@@ -264,6 +282,8 @@ List<Artist> buildMockArtists() => [
   ),
   Artist(
     id: 'i1',
+    // Foto de ejemplo: Wanyoike Mbugua / Unsplash.
+    photoUrl: _photo('photo-1522168709594-942fcde3d332'),
     name: 'Ángel "Bongó" Pérez',
     category: ArtistCategory.musicoIndependiente,
     instruments: ['Bongosero', 'Conguero', 'Percusionista'],
@@ -296,6 +316,8 @@ List<Artist> buildMockArtists() => [
   ),
   Artist(
     id: 'i2',
+    // Foto de ejemplo: DM David / Unsplash.
+    photoUrl: _photo('photo-1698158360685-db3f94818c4a'),
     name: 'Carla Méndez',
     category: ArtistCategory.musicoIndependiente,
     instruments: ['Bajista'],
@@ -322,6 +344,8 @@ List<Artist> buildMockArtists() => [
   ),
   Artist(
     id: 'i3',
+    // Foto de ejemplo: Jacek Dylag / Unsplash.
+    photoUrl: _photo('photo-1525201548942-d8732f6617a0'),
     name: 'José Luis Ortiz',
     category: ArtistCategory.musicoIndependiente,
     instruments: ['Cuatrista', 'Guitarrista'],
@@ -353,6 +377,8 @@ List<Artist> buildMockArtists() => [
   ),
   Artist(
     id: 'p1',
+    // Foto de ejemplo: Peter Scholten / Unsplash.
+    photoUrl: _photo('photo-1599163872948-9b8979218452'),
     name: 'Payasita Chispita',
     category: ArtistCategory.payaso,
     genres: ['Show infantil', 'Globoflexia', 'Pintacaras', 'Juegos'],

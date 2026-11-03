@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../app_state.dart';
 import '../models.dart';
+import '../theme.dart';
 
 class AccountScreen extends StatelessWidget {
   const AccountScreen({super.key});
@@ -47,6 +48,17 @@ class AccountScreen extends StatelessWidget {
                   title: Text(a.email),
                 ),
               ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Card(
+            child: SwitchListTile(
+              secondary: const Icon(Icons.auto_awesome),
+              title: const Text('Estilo futurista'),
+              subtitle: const Text('Apágalo para ver el diseño clásico.'),
+              value: appStyle.value == AppStyle.futurista,
+              onChanged: (v) =>
+                  appStyle.value = v ? AppStyle.futurista : AppStyle.clasico,
             ),
           ),
           const SizedBox(height: 16),

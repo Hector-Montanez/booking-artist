@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../theme.dart';
+
 /// Fotos de fondo para las pantallas de bienvenida e inicio de sesión.
 ///
 /// Todas son de Unsplash bajo la Unsplash License (uso comercial gratis,
@@ -92,6 +94,7 @@ class _StageSlideshowState extends State<StageSlideshow> {
   @override
   Widget build(BuildContext context) {
     final photo = stagePhotos[_index];
+    final neon = isFuturista(context);
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -131,6 +134,23 @@ class _StageSlideshowState extends State<StageSlideshow> {
             ),
           ),
         ),
+        // En el estilo futurista, un velo cian y magenta encima de la foto.
+        if (neon) ...[
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  NeonColors.cyan.withValues(alpha: 0.22),
+                  Colors.transparent,
+                  NeonColors.magenta.withValues(alpha: 0.28),
+                ],
+              ),
+            ),
+          ),
+          const IgnorePointer(child: CustomPaint(painter: ScanlinePainter())),
+        ],
         if (!_inWidgetTest)
           Positioned(
             right: 8,
@@ -144,11 +164,7 @@ class _StageSlideshowState extends State<StageSlideshow> {
           ),
         // El contenido usa el tema oscuro para que se lea sobre las fotos.
         Theme(
-          data: ThemeData(
-            colorSchemeSeed: const Color(0xFF6A1B9A),
-            brightness: Brightness.dark,
-            useMaterial3: true,
-          ),
+          data: neon ? futuristTheme() : classicTheme(Brightness.dark),
           child: widget.child,
         ),
       ],
@@ -198,14 +214,43 @@ class GlassPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final neon = isFuturista(context);
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xB3121018),
+        color: neon ? const Color(0xB305060F) : const Color(0xB3121018),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white12),
+        border: Border.all(
+          color: neon
+              ? NeonColors.cyan.withValues(alpha: 0.45)
+              : Colors.white12,
+        ),
+        boxShadow: neon
+            ? [
+                BoxShadow(
+                  color: NeonColors.cyan.withValues(alpha: 0.18),
+                  blurRadius: 24,
+                ),
+              ]
+            : null,
       ),
       child: child,
     );
   }
+}
+
+/// Líneas horizontales finas, como de pantalla holográfica.
+class ScanlinePainter extends CustomPainter {
+  const ScanlinePainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final p = Paint()..color = const Color(0x14000000);
+    for (var y = 0.0; y < size.height; y += 4) {
+      canvas.drawRect(Rect.fromLTWH(0, y, size.width, 2), p);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

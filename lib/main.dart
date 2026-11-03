@@ -11,6 +11,7 @@ import 'screens/explore_screen.dart';
 import 'screens/inbox_screen.dart';
 import 'screens/my_bookings_screen.dart';
 import 'screens/welcome_screen.dart';
+import 'theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,26 +26,26 @@ class BookingArtistApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Booking Artist',
-      debugShowCheckedModeBanner: false,
-      locale: const Locale('es'),
-      supportedLocales: const [Locale('es'), Locale('en')],
-      localizationsDelegates: const [
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
-      theme: ThemeData(
-        colorSchemeSeed: const Color(0xFF6A1B9A),
-        useMaterial3: true,
+    return ValueListenableBuilder(
+      valueListenable: appStyle,
+      builder: (context, style, _) => MaterialApp(
+        title: 'Booking Artist',
+        debugShowCheckedModeBanner: false,
+        locale: const Locale('es'),
+        supportedLocales: const [Locale('es'), Locale('en')],
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        theme: style == AppStyle.futurista
+            ? futuristTheme()
+            : classicTheme(Brightness.light),
+        darkTheme: style == AppStyle.futurista
+            ? futuristTheme()
+            : classicTheme(Brightness.dark),
+        home: const RootGate(),
       ),
-      darkTheme: ThemeData(
-        colorSchemeSeed: const Color(0xFF6A1B9A),
-        brightness: Brightness.dark,
-        useMaterial3: true,
-      ),
-      home: const RootGate(),
     );
   }
 }
@@ -144,7 +145,11 @@ class _ShellState extends State<_Shell> {
           ];
 
     return Scaffold(
-      body: IndexedStack(index: _tab, children: pages),
+      body: isFuturista(context)
+          ? NeonBackdrop(
+              child: IndexedStack(index: _tab, children: pages),
+            )
+          : IndexedStack(index: _tab, children: pages),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _tab,
         onDestinationSelected: (i) => setState(() => _tab = i),
