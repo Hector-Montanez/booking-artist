@@ -111,7 +111,10 @@ module.exports = async (req, res) => {
 
     const link = process.env.APP_URL ? `\n${process.env.APP_URL}` : '';
     const [sms, email] = await Promise.all([
-      n.sms ? sendSms(toE164(user.phone), `Booking Artist: ${n.title}. ${n.body}${link}`) : 'omitido',
+      // SMS solo a quien lo aceptó al crear su cuenta o en Mi cuenta.
+      n.sms && user.smsOptIn === true
+        ? sendSms(toE164(user.phone), `Booking Artist: ${n.title}. ${n.body}${link}\nResponde STOP para no recibir más SMS.`)
+        : 'omitido',
       sendEmail(n.recipientEmail, n.title, `Hola ${user.name || ''}:\n\n${n.body}\n\nAbre la app para ver los detalles.${link}\n\nBooking Artist`),
     ]);
     await ref.update({ delivery: { status: 'listo', sms, email, at: Date.now() } });

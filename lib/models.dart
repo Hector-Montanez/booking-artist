@@ -434,6 +434,7 @@ class Account {
     this.town = 'Caguas',
     this.artist,
     this.password = '',
+    this.smsOptIn = false,
   });
 
   final UserRole role;
@@ -444,6 +445,10 @@ class Account {
   String businessName;
   String address;
   String town;
+
+  /// Aceptó recibir SMS sobre sus reservas. Sin esto el servidor no le envía
+  /// SMS (lo exigen las compañías de teléfono); los emails siguen llegando.
+  bool smsOptIn;
 
   /// Página pública del artista, si la cuenta es de artista.
   final Artist? artist;
@@ -519,3 +524,11 @@ class Conversation {
 
   DateTime? get lastAt => messages.isEmpty ? null : messages.last.sentAt;
 }
+
+/// Texto del permiso para SMS. Es el mismo que se describe en el registro del
+/// número toll-free de Twilio; si se cambia aquí, hay que cambiarlo allá.
+const smsConsentTitle = 'Acepto recibir SMS sobre mis reservas';
+const smsConsentDetail =
+    'Solicitudes nuevas, reservas aceptadas o rechazadas y pagos. '
+    'Sin publicidad. Pueden aplicar cargos de mensajes y datos. '
+    'Responde STOP para dejar de recibirlos o HELP para ayuda.';

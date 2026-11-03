@@ -3,7 +3,8 @@ const Module = require('module');
 const assert = require('assert');
 const store = {
   'notifications/n1': { senderUid: 'client1', recipientEmail: 'sofia@ejemplo.com', title: 'Nueva solicitud de reserva', body: 'El Patio quiere reservarte.', sms: true },
-  'users/art1': { name: 'Sofía', phone: '(787) 555-0101' },
+  'users/art1': { name: 'Sofía', phone: '(787) 555-0101', smsOptIn: true },
+  'notifications/n2': { senderUid: 'client1', recipientEmail: 'sofia@ejemplo.com', title: 'T', body: 'B', sms: true },
 };
 const ref = (k) => ({
   get: async () => ({ data: () => store[k] && { ...store[k] } }),
@@ -48,6 +49,11 @@ const call = (method, body, token = 'ok') => new Promise((done) => {
   const sms = sent.find((x) => x.url.includes('twilio'));
   assert.equal(new URLSearchParams(sms.body).get('To'), '+17875550101');
   assert.ok(JSON.parse(sent.find((x) => x.url.includes('resend')).body).to[0] === 'sofia@ejemplo.com');
+  assert.match(new URLSearchParams(sms.body).get('Body'), /STOP/);
+  // Sin permiso para SMS solo sale el email.
+  store['users/art1'].smsOptIn = false;
+  const r2 = await call('POST', { id: 'n2' });
+  assert.deepEqual([r2.sms, r2.email], ['omitido', 'enviado']);
   // Un aviso se envía una sola vez.
   assert.equal((await call('POST', { id: 'n1' })).code, 409);
   console.log('notify: todas las pruebas pasaron');
