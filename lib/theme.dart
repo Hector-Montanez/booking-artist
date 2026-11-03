@@ -334,3 +334,74 @@ class StyleToggleButton extends StatelessWidget {
     );
   }
 }
+
+/// Color de acento que se ve bien sobre el fondo oscuro del estilo futurista:
+/// los colores muy oscuros se aclaran para que brillen como neón.
+Color neonAccent(Color c) {
+  final hsl = HSLColor.fromColor(c);
+  return hsl
+      .withLightness(hsl.lightness.clamp(0.55, 0.75))
+      .withSaturation(
+        hsl.saturation.clamp(0.0, 1.0) < 0.15 ? 0.15 : hsl.saturation,
+      )
+      .toColor();
+}
+
+/// Tema de la página de un artista: usa el color que el artista escogió para
+/// los botones, precios, etiquetas y la portada.
+ThemeData artistPageTheme(ThemeData base, Color color) {
+  if (base.extension<Neon>() == null) {
+    return base.copyWith(
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: color,
+        brightness: base.brightness,
+        dynamicSchemeVariant: DynamicSchemeVariant.fidelity,
+      ),
+    );
+  }
+  final accent = neonAccent(color);
+  final onAccent = accent.computeLuminance() > 0.4
+      ? const Color(0xFF05060F)
+      : Colors.white;
+  final soft = BorderSide(color: accent.withValues(alpha: 0.35));
+  return base.copyWith(
+    colorScheme: base.colorScheme.copyWith(
+      primary: accent,
+      onPrimary: onAccent,
+      primaryContainer: Color.lerp(accent, NeonColors.bg, 0.7),
+      onPrimaryContainer: accent,
+    ),
+    cardTheme: base.cardTheme.copyWith(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: soft,
+      ),
+    ),
+    chipTheme: base.chipTheme.copyWith(
+      side: soft,
+      selectedColor: accent.withValues(alpha: 0.22),
+      checkmarkColor: accent,
+      iconTheme: IconThemeData(color: accent, size: 18),
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(foregroundColor: accent),
+    ),
+    filledButtonTheme: FilledButtonThemeData(
+      style: base.filledButtonTheme.style?.copyWith(
+        backgroundColor: WidgetStatePropertyAll(accent),
+        foregroundColor: WidgetStatePropertyAll(onAccent),
+      ),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: base.outlinedButtonTheme.style?.copyWith(
+        foregroundColor: WidgetStatePropertyAll(accent),
+        side: WidgetStatePropertyAll(
+          BorderSide(color: accent.withValues(alpha: 0.6)),
+        ),
+      ),
+    ),
+    iconButtonTheme: IconButtonThemeData(
+      style: IconButton.styleFrom(foregroundColor: accent),
+    ),
+  );
+}

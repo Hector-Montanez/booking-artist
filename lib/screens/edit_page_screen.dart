@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../app_state.dart';
 import '../models.dart';
+import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/pickers.dart';
 import 'artist_detail_screen.dart';
@@ -66,6 +67,14 @@ class _EditPageScreenState extends State<EditPageScreen> {
   @override
   Widget build(BuildContext context) {
     AppScope.of(context);
+    // El editor también toma el color escogido, para que se vea el cambio.
+    return Theme(
+      data: artistPageTheme(Theme.of(context), _me.color),
+      child: Builder(builder: _editor),
+    );
+  }
+
+  Widget _editor(BuildContext context) {
     final theme = Theme.of(context);
 
     return Scaffold(

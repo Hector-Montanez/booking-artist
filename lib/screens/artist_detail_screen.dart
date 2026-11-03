@@ -24,7 +24,17 @@ class ArtistDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     AppScope.of(context); // se reconstruye si el artista cambia sus precios
+    // La página entera usa el color que escogió el artista.
+    final theme = artistPageTheme(Theme.of(context), artist.color);
+    return Theme(
+      data: theme,
+      child: Builder(builder: _page),
+    );
+  }
+
+  Widget _page(BuildContext context) {
     final theme = Theme.of(context);
+    final accent = theme.colorScheme.primary;
     // Videos y publicaciones que se pueden ver con el reproductor oficial.
     final videos = artist.links
         .where((l) => embedUrl(l.url) != null || l.kind == LinkKind.youtube)
@@ -49,12 +59,12 @@ class ArtistDetailScreen extends StatelessWidget {
                   artist.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: 'Orbitron',
                     fontWeight: FontWeight.w800,
                     letterSpacing: 1,
                     color: Colors.white,
-                    shadows: [Shadow(color: NeonColors.cyan, blurRadius: 14)],
+                    shadows: [Shadow(color: accent, blurRadius: 14)],
                   ),
                 ),
                 background: Stack(
@@ -72,7 +82,7 @@ class ArtistDetailScreen extends StatelessWidget {
                           colors: [
                             const Color(0x8005060F),
                             const Color(0x0005060F),
-                            artist.color.withValues(alpha: 0.25),
+                            accent.withValues(alpha: 0.45),
                             NeonColors.bg,
                           ],
                           stops: const [0, 0.3, 0.7, 1],
@@ -95,9 +105,10 @@ class ArtistDetailScreen extends StatelessWidget {
                         : DecorationImage(
                             image: MemoryImage(artist.cover!),
                             fit: BoxFit.cover,
+                            // Tiñe la portada con el color de la página.
                             colorFilter: ColorFilter.mode(
-                              Colors.black.withValues(alpha: 0.25),
-                              BlendMode.darken,
+                              artist.color.withValues(alpha: 0.35),
+                              BlendMode.srcATop,
                             ),
                           ),
                     gradient: LinearGradient(
@@ -149,7 +160,7 @@ class ArtistDetailScreen extends StatelessWidget {
                       artist.tagline,
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontStyle: FontStyle.italic,
-                        color: artist.color,
+                        color: accent,
                       ),
                     ),
                   ),
@@ -322,9 +333,7 @@ class ArtistDetailScreen extends StatelessWidget {
                         Text(
                           money(artist.minPrice),
                           style: theme.textTheme.titleLarge?.copyWith(
-                            color: isFuturista(context)
-                                ? NeonColors.cyan
-                                : null,
+                            color: isFuturista(context) ? accent : null,
                           ),
                         ),
                       ],
@@ -391,18 +400,18 @@ class _SectionTitle extends StatelessWidget {
             height: 20,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(2),
-              gradient: const LinearGradient(
-                colors: [NeonColors.cyan, NeonColors.magenta],
+              gradient: LinearGradient(
+                colors: [
+                  Theme.of(context).colorScheme.primary,
+                  NeonColors.magenta,
+                ],
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
               ),
             ),
           ),
           const SizedBox(width: 10),
-          Text(
-            text,
-            style: style?.copyWith(fontSize: 15, letterSpacing: 2),
-          ),
+          Text(text, style: style?.copyWith(fontSize: 15, letterSpacing: 2)),
         ],
       ),
     );
