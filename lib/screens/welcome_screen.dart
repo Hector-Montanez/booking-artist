@@ -45,17 +45,16 @@ class _WelcomeContent extends StatelessWidget {
                   const SizedBox(height: 16),
                   if (neon)
                     NeonText(
-                      'BOOKING\nARTIST',
+                      'TARIMA',
                       textAlign: TextAlign.center,
-                      style: theme.textTheme.displaySmall?.copyWith(
+                      style: theme.textTheme.displayMedium?.copyWith(
                         fontWeight: FontWeight.w900,
-                        letterSpacing: 6,
-                        height: 1.1,
+                        letterSpacing: 10,
                       ),
                     )
                   else
                     Text(
-                      'Booking Artist',
+                      'Tarima',
                       textAlign: TextAlign.center,
                       style: theme.textTheme.headlineMedium?.copyWith(
                         fontWeight: FontWeight.bold,

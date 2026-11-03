@@ -60,7 +60,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 children: [
                   if (isFuturista(context)) ...[
                     NeonText(
-                      'BOOKING//ARTIST',
+                      'TARIMA',
                       style: Theme.of(context).textTheme.labelLarge?.copyWith(
                         fontFamily: 'Orbitron',
                         fontWeight: FontWeight.w900,

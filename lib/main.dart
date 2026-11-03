@@ -29,7 +29,7 @@ class BookingArtistApp extends StatelessWidget {
     return ValueListenableBuilder(
       valueListenable: appStyle,
       builder: (context, style, _) => MaterialApp(
-        title: 'Booking Artist',
+        title: 'Tarima',
         debugShowCheckedModeBanner: false,
         locale: const Locale('es'),
         supportedLocales: const [Locale('es'), Locale('en')],
