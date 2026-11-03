@@ -11,6 +11,9 @@ void main() {
     tester.view.physicalSize = const Size(1080, 2400);
     tester.view.devicePixelRatio = 2.5;
     addTearDown(tester.view.reset);
+    tester.view.physicalSize = const Size(1080, 3200);
+    tester.view.devicePixelRatio = 2.5;
+    addTearDown(tester.view.reset);
     final state = AppState();
     await tester.pumpWidget(
       AppScope(state: state, child: const BookingArtistApp()),
@@ -28,11 +31,18 @@ void main() {
     await tester.enterText(fields.at(4), '787 555 1234');
     await tester.enterText(fields.at(5), 'ana@elpatio.com');
     await tester.enterText(fields.at(6), 'secreto1');
+    // El permiso para SMS empieza sin marcar.
+    await tester.ensureVisible(
+      find.text('Acepto recibir SMS sobre mis reservas'),
+    );
+    await tester.tap(find.text('Acepto recibir SMS sobre mis reservas'));
+    await tester.pump();
     await tester.tap(find.text('Crear cuenta'));
     await tester.pumpAndSettle();
 
     expect(state.account?.clientType, ClientType.restaurante);
     expect(state.account?.displayName, 'El Patio');
+    expect(state.account?.smsOptIn, isTrue);
     expect(find.text('Caguas, Puerto Rico'), findsOneWidget);
     await tester.tap(find.text('Sofía Rivera'));
     await tester.pumpAndSettle();

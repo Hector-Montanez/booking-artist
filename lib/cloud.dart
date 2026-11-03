@@ -378,6 +378,11 @@ class Cloud {
         .update({byArtist ? 'unreadByArtist' : 'unreadByClient': 0});
   }
 
+  /// Guarda si la persona quiere recibir SMS.
+  void saveSmsOptIn(bool value) {
+    _col('users').doc(uid).update({'smsOptIn': value}).catchError(_ignore);
+  }
+
   void saveNotification(AppNotification n) {
     final doc = _col('notifications').doc();
     n.id = doc.id;
@@ -555,6 +560,7 @@ Map<String, dynamic> accountToMap(Account a) => {
   'businessName': a.businessName,
   'address': a.address,
   'town': a.town,
+  'smsOptIn': a.smsOptIn,
 };
 
 Account accountFromMap(Map<String, dynamic> d, Artist? artist) => Account(
@@ -567,6 +573,7 @@ Account accountFromMap(Map<String, dynamic> d, Artist? artist) => Account(
   address: d['address'] ?? '',
   town: d['town'] ?? 'Caguas',
   artist: artist,
+  smsOptIn: d['smsOptIn'] == true,
 );
 
 /// Las fotos se guardan dentro del documento (máximo ~1 MB por documento),
