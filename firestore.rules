@@ -1,0 +1,67 @@
+rules_version = '2';
+
+// Reglas de seguridad de Booking Artist.
+// Se pegan en Consola de Firebase → Firestore Database → Reglas → Publicar.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function me() { return request.auth.uid; }
+
+    // Datos de la cuenta: solo su dueño.
+    match /users/{uid} {
+      allow read, write: if signedIn() && me() == uid;
+    }
+
+    // Página pública del artista: todos la ven, solo el artista la cambia.
+    match /artists/{uid} {
+      allow read: if true;
+      allow write: if signedIn() && me() == uid;
+    }
+
+    // Horas ocupadas (sin datos del cliente), para mostrar horarios libres.
+    match /busy/{bookingId} {
+      allow read: if true;
+      allow create: if signedIn() && request.resource.data.clientUid == me();
+      allow update, delete: if signedIn() &&
+        (resource.data.clientUid == me() || resource.data.artistId == me());
+    }
+
+    // Reservas: solo el cliente que la hizo y el artista reservado.
+    // Una reserva nueva empieza sin pagar (porPagar). El pago, el monto y el
+    // estado de las reservas con cobro real solo los cambia el servidor de
+    // pagos (/api/pay). Las de pago simulado se pueden cambiar desde la app.
+    function party() {
+      return resource.data.clientUid == me() || resource.data.artistId == me();
+    }
+    match /bookings/{id} {
+      allow create: if signedIn() && request.resource.data.clientUid == me() &&
+        request.resource.data.status == 'pendiente' &&
+        request.resource.data.payment in ['porPagar', 'simulado'];
+      allow read: if signedIn() && party();
+      allow update: if signedIn() && party() &&
+        resource.data.payment == 'simulado' &&
+        request.resource.data.payment == 'simulado';
+    }
+
+    // Datos internos de cada cobro (Stripe / ATH Móvil): solo el servidor.
+    match /payments/{id} {
+      allow read, write: if false;
+    }
+
+    // Chats: solo las dos personas de la conversación.
+    match /conversations/{id} {
+      allow read, update: if signedIn() &&
+        (resource.data.clientUid == me() || resource.data.artistId == me());
+      allow create: if signedIn() &&
+        (request.resource.data.clientUid == me() ||
+         request.resource.data.artistId == me());
+    }
+
+    // Avisos: cualquiera con cuenta puede enviar; solo el destinatario los lee.
+    match /notifications/{id} {
+      allow create: if signedIn();
+      allow read, update: if signedIn() &&
+        resource.data.recipientEmail == request.auth.token.email;
+    }
+  }
+}

@@ -1,0 +1,386 @@
+import 'package:flutter/material.dart';
+
+import '../app_state.dart';
+import '../availability.dart';
+import '../models.dart';
+import '../widgets/common.dart';
+import '../widgets/embed_player.dart';
+import 'booking_screen.dart';
+import 'inbox_screen.dart';
+
+class ArtistDetailScreen extends StatelessWidget {
+  const ArtistDetailScreen({
+    super.key,
+    required this.artist,
+    this.preview = false,
+  });
+
+  final Artist artist;
+
+  /// El artista está viendo su propia página: se oculta el botón Reservar.
+  final bool preview;
+
+  @override
+  Widget build(BuildContext context) {
+    AppScope.of(context); // se reconstruye si el artista cambia sus precios
+    final theme = Theme.of(context);
+    // Videos y publicaciones que se pueden ver con el reproductor oficial.
+    final videos = artist.links
+        .where((l) => embedUrl(l.url) != null || l.kind == LinkKind.youtube)
+        .toList();
+    final socials = artist.links.where((l) => !videos.contains(l)).toList();
+
+    return Scaffold(
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar.large(
+            title: Text(artist.name),
+            expandedHeight: 220,
+            flexibleSpace: FlexibleSpaceBar(
+              background: Container(
+                decoration: BoxDecoration(
+                  image: artist.cover == null
+                      ? null
+                      : DecorationImage(
+                          image: MemoryImage(artist.cover!),
+                          fit: BoxFit.cover,
+                          colorFilter: ColorFilter.mode(
+                            Colors.black.withValues(alpha: 0.25),
+                            BlendMode.darken,
+                          ),
+                        ),
+                  gradient: LinearGradient(
+                    colors: [
+                      artist.color.withValues(alpha: 0.85),
+                      theme.colorScheme.surface,
+                    ],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  ),
+                ),
+                alignment: const Alignment(0, -0.1),
+                child: Hero(
+                  tag: 'avatar-${artist.id}',
+                  child: ArtistAvatar(artist: artist, size: 88),
+                ),
+              ),
+            ),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 120),
+            sliver: SliverList.list(
+              children: [
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Chip(
+                      avatar: Icon(artist.category.icon, size: 18),
+                      label: Text(artist.category.label),
+                    ),
+                    RatingLabel(artist: artist),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.place, size: 16),
+                        Text(
+                          ' ${artist.distanceKm} km · ${artist.zone.contains('Caguas') ? artist.zone : '${artist.zone}, Caguas'}',
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                if (artist.tagline.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      artist.tagline,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontStyle: FontStyle.italic,
+                        color: artist.color,
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 12),
+                if (artist.demoNote != null)
+                  Card(
+                    color: theme.colorScheme.secondaryContainer,
+                    margin: const EdgeInsets.only(bottom: 12),
+                    child: ListTile(
+                      leading: const Icon(Icons.info_outline),
+                      title: Text(artist.demoNote!),
+                    ),
+                  ),
+                Text(artist.bio, style: theme.textTheme.bodyLarge),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  children: [
+                    for (final g in artist.genres)
+                      Chip(
+                        label: Text(g),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                  ],
+                ),
+                if (artist.instruments.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      for (final i in artist.instruments)
+                        Chip(
+                          avatar: const Icon(Icons.music_note, size: 16),
+                          label: Text(i),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: 8),
+                Text(
+                  'Disponible para: ${artist.eventTypes.map((e) => e.label).join(', ')}',
+                  style: theme.textTheme.bodyMedium,
+                ),
+                const _SectionTitle('Precios del artista'),
+                for (final p in artist.packages)
+                  Card(
+                    child: ListTile(
+                      title: Text(p.name),
+                      subtitle: Text(
+                        [
+                          '${_hours(p.hours)} de presentación',
+                          if (p.description.isNotEmpty) p.description,
+                        ].join('\n'),
+                      ),
+                      isThreeLine: p.description.isNotEmpty,
+                      trailing: Text(
+                        money(p.price),
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      onTap: () => _book(context, p),
+                    ),
+                  ),
+                const _SectionTitle('Horario'),
+                if (artist.weeklyHours.isEmpty)
+                  const Text('Este artista aún no ha publicado su horario.'),
+                for (final day in weekdayNames.keys)
+                  if (artist.weeklyHours[day] case final h?)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: Row(
+                        children: [
+                          SizedBox(width: 110, child: Text(weekdayNames[day]!)),
+                          Text(
+                            '${formatMinutes(context, h.start)} a '
+                            '${formatMinutes(context, h.end)}',
+                          ),
+                        ],
+                      ),
+                    ),
+                const _SectionTitle('Condiciones'),
+                Text(
+                  'Depósito para reservar: ${artist.depositPercent}% del total. '
+                  '${artist.conditions}',
+                ),
+                if (artist.gallery.isNotEmpty) ...[
+                  const _SectionTitle('Fotos'),
+                  SizedBox(
+                    height: 140,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: artist.gallery.length,
+                      separatorBuilder: (_, _) => const SizedBox(width: 8),
+                      itemBuilder: (context, i) => GestureDetector(
+                        onTap: () => showDialog<void>(
+                          context: context,
+                          builder: (_) => Dialog(
+                            clipBehavior: Clip.antiAlias,
+                            child: InteractiveViewer(
+                              child: Image.memory(artist.gallery[i]),
+                            ),
+                          ),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.memory(
+                            artist.gallery[i],
+                            width: 140,
+                            height: 140,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+                if (videos.isNotEmpty) ...[
+                  const _SectionTitle('Videos'),
+                  SizedBox(
+                    height: 130,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: videos.length,
+                      separatorBuilder: (_, _) => const SizedBox(width: 12),
+                      itemBuilder: (_, i) =>
+                          _VideoTile(link: videos[i], color: artist.color),
+                    ),
+                  ),
+                ],
+                if (socials.isNotEmpty) ...[
+                  const _SectionTitle('Redes y enlaces'),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final l in socials)
+                        ActionChip(
+                          avatar: Icon(
+                            l.kind.icon,
+                            color: l.kind.color,
+                            size: 18,
+                          ),
+                          label: Text(l.title),
+                          onPressed: () => openLink(context, l.url),
+                        ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+      bottomNavigationBar: preview
+          ? null
+          : SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('desde'),
+                        Text(
+                          money(artist.minPrice),
+                          style: theme.textTheme.titleLarge,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(width: 12),
+                    IconButton.outlined(
+                      tooltip: 'Enviar mensaje',
+                      icon: const Icon(Icons.chat_bubble_outline),
+                      onPressed: AppScope.of(context).account == null
+                          ? null
+                          : () => chatWithArtist(context, artist),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: artist.packages.isEmpty
+                            ? null
+                            : () => _book(context, null),
+                        icon: const Icon(Icons.event_available),
+                        label: const Text('Reservar'),
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size.fromHeight(52),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+    );
+  }
+
+  void _book(BuildContext context, PricePackage? p) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => BookingScreen(artist: artist, initialPackage: p),
+      ),
+    );
+  }
+}
+
+String _hours(double h) => h == h.roundToDouble() ? '${h.toInt()} h' : '$h h';
+
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: 24, bottom: 8),
+    child: Text(text, style: Theme.of(context).textTheme.titleLarge),
+  );
+}
+
+class _VideoTile extends StatelessWidget {
+  const _VideoTile({required this.link, required this.color});
+
+  final MediaLink link;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final thumb = thumbnailUrl(link.url);
+    final placeholder = Container(color: color.withValues(alpha: 0.25));
+    return SizedBox(
+      width: 200,
+      child: Card(
+        clipBehavior: Clip.antiAlias,
+        margin: EdgeInsets.zero,
+        child: InkWell(
+          onTap: () => playMedia(context, link),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    if (thumb == null)
+                      placeholder
+                    else
+                      Image.network(
+                        thumb,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => placeholder,
+                      ),
+                    Center(
+                      child: Icon(
+                        link.kind.icon == Icons.smart_display
+                            ? Icons.play_circle_fill
+                            : link.kind.icon,
+                        size: 48,
+                        color: link.kind.color,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(8),
+                child: Text(
+                  link.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
