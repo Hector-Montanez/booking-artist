@@ -64,7 +64,7 @@ class _WelcomeContent extends StatelessWidget {
                     ),
                   const SizedBox(height: 8),
                   Text(
-                    'Contrata músicos, agrupaciones, DJs y payasos en Caguas, '
+                    'Contrata músicos, agrupaciones, DJs y payasos en Puerto Rico, '
                     'con los precios que fija cada artista.',
                     textAlign: TextAlign.center,
                     style: theme.textTheme.bodyLarge?.copyWith(

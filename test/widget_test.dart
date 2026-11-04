@@ -33,7 +33,7 @@ void main() {
 
     expect(state.account?.clientType, ClientType.restaurante);
     expect(state.account?.displayName, 'El Patio');
-    expect(find.text('Caguas, Puerto Rico'), findsOneWidget);
+    expect(find.text('Puerto Rico'), findsOneWidget);
     await tester.tap(find.text('Sofía Rivera'));
     await tester.pumpAndSettle();
     expect(find.text('Precios del artista'), findsOneWidget);

@@ -110,6 +110,30 @@ class Cloud {
     await _auth.signOut();
   }
 
+  /// Borra la cuenta para siempre: la página de artista, los datos de la
+  /// cuenta y el acceso. Pide la contraseña otra vez (Firebase lo exige para
+  /// borrar). Devuelve un mensaje de error, o null si salió bien.
+  Future<String?> deleteAccount(String password) async {
+    final user = _auth.currentUser;
+    final email = user?.email;
+    if (user == null || email == null) return 'No hay sesión abierta.';
+    try {
+      await user.reauthenticateWithCredential(
+        EmailAuthProvider.credential(email: email, password: password),
+      );
+      final id = user.uid;
+      _cancelPrivate();
+      if (state.isArtist) await _col('artists').doc(id).delete();
+      await _col('users').doc(id).delete();
+      await user.delete();
+      return null;
+    } on FirebaseAuthException catch (e) {
+      return authError(e.code);
+    } catch (_) {
+      return 'No se pudo borrar la cuenta. Revisa tu conexión.';
+    }
+  }
+
   Future<void> _loadAccount() async {
     final id = uid!;
     final doc = await _col('users').doc(id).get();
@@ -131,6 +155,12 @@ class Cloud {
 
   void _listenPublic() {
     _col('artists').snapshots().listen((snap) {
+      // Artistas que borraron su cuenta.
+      for (final change in snap.docChanges) {
+        if (change.type == DocumentChangeType.removed) {
+          state.artists.removeWhere((a) => a.id == change.doc.id);
+        }
+      }
       for (final doc in snap.docs) {
         final existing = state.artists.where((a) => a.id == doc.id).firstOrNull;
         if (existing == null) {

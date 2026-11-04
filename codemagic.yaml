@@ -1,0 +1,45 @@
+# Compila Tarima para iPhone en Codemagic (codemagic.io), sin necesidad de Mac,
+# y la sube a TestFlight / App Store Connect.
+#
+# Antes de usarlo (una sola vez, en Codemagic):
+# 1. Conecta el repositorio de GitHub.
+# 2. Team settings → Integrations → Developer Portal: conecta tu cuenta de
+#    Apple con una "App Store Connect API key" y ponle de nombre: tarima_asc
+# 3. En la app de Codemagic → Environment variables, crea el grupo "tarima" con
+#    FIREBASE_IOS_APP_ID (el GOOGLE_APP_ID de la app iOS en Firebase) y
+#    APP_STORE_APPLE_ID (el número "Apple ID" de la app en App Store Connect).
+workflows:
+  ios-testflight:
+    name: Tarima iOS → TestFlight
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: tarima_asc
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+      groups:
+        - tarima
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.tarimapr.app
+    scripts:
+      - name: Dependencias
+        script: flutter pub get
+      - name: Pruebas
+        script: flutter test
+      - name: Firma
+        script: xcode-project use-profiles
+      - name: Compilar .ipa
+        script: |
+          flutter build ipa --release \
+            --build-number=$(($(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" 2>/dev/null || echo 0) + 1)) \
+            --dart-define=FIREBASE_IOS_APP_ID=$FIREBASE_IOS_APP_ID \
+            --export-options-plist=/Users/builder/export_options.plist
+    artifacts:
+      - build/ios/ipa/*.ipa
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true

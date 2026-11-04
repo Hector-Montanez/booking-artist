@@ -192,7 +192,7 @@ class _EditPageScreenState extends State<EditPageScreen> {
             maxLength: 60,
             decoration: const InputDecoration(
               labelText: 'Frase corta',
-              hintText: 'Ej. La voz romántica de Caguas',
+              hintText: 'Ej. La voz romántica de Puerto Rico',
               border: OutlineInputBorder(),
             ),
             onChanged: (v) => _update(() => _me.tagline = v.trim()),

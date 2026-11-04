@@ -53932,7 +53932,7 @@ p=A.b([a0.y.ei(0.85),b.k2],t.g)
 a2.push(new A.A5(r,A.b55(A.fD(B.NK,A.Wd(new A.lL(a0,88,d),"avatar-"+a0.a,!1),B.E,d,d,new A.cQ(d,q,d,d,d,new A.fr(B.dx,B.d4,B.bv,p,d,d),B.aD),d,d,d,d,d,d,d),d,d),d,220,!0,64,B.Np,d))}r=a0.c
 r=A.DW(A.ch(A.ahk(r),d,d,d,18),d,A.S(A.Ds(r),d,d,d,d,d,d,d,d),d,d)
 q=a0.f
-q=B.c.m(q,"Caguas")?q:q+", Caguas"
+q=q
 q=A.b([A.iE(B.bq,A.b([r,new A.zA(a0,d),A.bQ(A.b([B.W6,A.S(" "+A.l(a0.r)+" km \xb7 "+q,d,d,d,d,d,d,d,d)],a1),B.B,B.m,B.aU,0,d)],a1),B.qU,8,8)],a1)
 r=a0.ch
 if(r.length!==0){p=c.ok.w
@@ -55777,7 +55777,7 @@ if(o){r=s.b
 n.push(new A.zb("TARIMA",r==null?q:r.aF7(B.kw,10),B.bN,q))}else{r=s.e
 n.push(A.S("Tarima",q,q,q,q,r==null?q:r.aFg(B.k,B.bG,B.a_f),B.bN,q,q))}n.push(B.aH)
 r=s.y
-n.push(A.S("Contrata m\xfasicos, agrupaciones, DJs y payasos en Caguas, con los precios que fija cada artista.",q,q,q,q,r==null?q:r.aF_(B.k,B.a1U),B.bN,q,q))
+n.push(A.S("Contrata m\xfasicos, agrupaciones, DJs y payasos en Puerto Rico, con los precios que fija cada artista.",q,q,q,q,r==null?q:r.aF_(B.k,B.a1U),B.bN,q,q))
 n.push(B.aft)
 n.push(new A.Og(B.oR,"Quiero contratar","Para restaurantes, bodas, cumplea\xf1os y actividades.",new A.aVH(a),q))
 n.push(B.b9)
@@ -128574,7 +128574,7 @@ B.UF=new A.fm(1,B.bU,B.afv,null)
 B.oL=new A.ii(600)
 B.mr=new A.y(!0,null,null,null,null,null,null,B.oL,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 B.aj=new A.Av(2,"ellipsis")
-B.alG=new A.bD("Caguas, Puerto Rico",null,B.mr,null,null,null,B.aj,null,null,null,null)
+B.alG=new A.bD("Puerto Rico",null,B.mr,null,null,null,B.aj,null,null,null,null)
 B.UG=new A.fm(1,B.bU,B.alG,null)
 B.UH=new A.Fw(null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)
 B.uP=new A.Fx(0,"Start")
@@ -128764,7 +128764,7 @@ B.ng=new A.aF(B.n,1,B.r,-1)
 B.af=new A.f7(4,B.fC,B.ng)
 B.WA=new A.e3(null,null,null,"Notas para el artista (opcional)",null,null,null,null,null,null,"Canciones especiales, n\xfamero de invitados\u2026",null,null,null,null,null,!0,!0,!1,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,B.af,!0,null,null,null,null)
 B.WB=new A.e3(null,null,null,"Qu\xe9 incluye (opcional)",null,null,null,null,null,null,null,null,null,null,null,null,!0,!0,!1,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,B.af,!0,null,null,null,null)
-B.WC=new A.e3(null,null,null,"Frase corta",null,null,null,null,null,null,"Ej. La voz rom\xe1ntica de Caguas",null,null,null,null,null,!0,!0,!1,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,B.af,!0,null,null,null,null)
+B.WC=new A.e3(null,null,null,"Frase corta",null,null,null,null,null,null,"Ej. La voz rom\xe1ntica de Puerto Rico",null,null,null,null,null,!0,!0,!1,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,B.af,!0,null,null,null,null)
 B.WD=new A.e3(null,null,null,"Nombre en la tarjeta",null,null,null,null,null,null,null,null,null,null,null,null,!0,!0,!1,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,B.af,!0,null,null,null,null)
 B.WE=new A.e3(null,null,null,"Tel\xe9fono de tu cuenta de ATH M\xf3vil",null,null,null,null,null,null,"7875550101",null,null,null,null,null,!0,!0,!1,null,null,null,null,null,null,null,null,null,B.va,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,B.af,!0,null,null,null,null)
 B.Ud=new A.aw(16,10,16,10)
@@ -128773,7 +128773,7 @@ B.O4=new A.cB(B.lU,B.lU,B.lU,B.lU)
 B.abj=new A.f7(4,B.O4,B.ng)
 B.WF=new A.e3(null,null,null,null,null,null,null,null,null,null,"Escribe un mensaje",null,null,null,null,null,!0,!0,!1,null,null,null,null,null,null,null,B.Ud,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,B.abj,!0,null,null,null,null)
 B.asf=new A.e3(null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,!0,!0,!1,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,!0,null,null,null,null)
-B.WG=new A.e3(null,null,null,"Lugar del evento",null,null,null,null,null,null,"Ej. Restaurante El Patio, Caguas",null,null,null,null,null,!0,!0,!1,null,null,null,null,null,null,null,null,null,B.v9,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,B.af,!0,null,null,null,null)
+B.WG=new A.e3(null,null,null,"Lugar del evento",null,null,null,null,null,null,"Ej. Restaurante El Patio, San Juan",null,null,null,null,null,!0,!0,!1,null,null,null,null,null,null,null,null,null,B.v9,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,B.af,!0,null,null,null,null)
 B.WH=new A.e3(null,null,null,"Tu nombre o negocio",null,null,null,null,null,null,null,null,null,null,null,null,!0,!0,!1,null,null,null,null,null,null,null,null,null,B.oS,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,B.af,!0,null,null,null,null)
 B.WI=new A.e3(null,null,null,"Nombre",null,null,null,null,null,null,null,null,null,null,null,null,!0,!0,!1,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,B.af,!0,null,null,null,null)
 B.VU=new A.c6(B.v1,null,null,null,null,null)

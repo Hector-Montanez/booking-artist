@@ -78,7 +78,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                       const SizedBox(width: 4),
                       const Flexible(
                         child: Text(
-                          'Caguas, Puerto Rico',
+                          'Puerto Rico',
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(fontWeight: FontWeight.w600),
                         ),

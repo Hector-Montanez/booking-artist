@@ -147,7 +147,7 @@ class ArtistDetailScreen extends StatelessWidget {
                       children: [
                         const Icon(Icons.place, size: 16),
                         Text(
-                          ' ${artist.distanceKm} km · ${artist.zone.contains('Caguas') ? artist.zone : '${artist.zone}, Caguas'}',
+                          ' ${artist.distanceKm} km · ${artist.zone}',
                         ),
                       ],
                     ),
