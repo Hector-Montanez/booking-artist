@@ -9,6 +9,25 @@
 #    FIREBASE_IOS_APP_ID (el GOOGLE_APP_ID de la app iOS en Firebase) y
 #    APP_STORE_APPLE_ID (el número "Apple ID" de la app en App Store Connect).
 workflows:
+  # Prueba rápida: compila para iPhone sin firmar. No necesita cuenta de Apple.
+  ios-prueba:
+    name: Tarima iOS (prueba, sin Apple)
+    max_build_duration: 45
+    instance_type: mac_mini_m2
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+    scripts:
+      - name: Dependencias
+        script: flutter pub get
+      - name: Pruebas
+        script: flutter test
+      - name: Compilar para iPhone (sin firma)
+        script: flutter build ios --release --no-codesign
+    artifacts:
+      - build/ios/iphoneos/*.app
+
   ios-testflight:
     name: Tarima iOS → TestFlight
     max_build_duration: 60
