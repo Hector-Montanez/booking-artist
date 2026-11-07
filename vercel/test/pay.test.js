@@ -54,6 +54,7 @@ const call = (body, uid = 'client1') => new Promise((resolve) => {
 const assert = require('assert');
 (async () => {
   store['artists/art1'] = { name: 'Sofía', depositPercent: 30, packages: [{ name: 'Básico', price: 175 }] };
+  store['subscriptions/art1'] = { status: 'active', trialEnd: 0, paidUntil: Date.now() + 86400000 };
   const mk = (id, payDeposit = true) => { store[`bookings/${id}`] = { clientUid: 'client1', artistId: 'art1', package: 'Básico', payDeposit, status: 'pendiente', payment: 'porPagar', total: 1, amountCharged: 1 }; store[`busy/${id}`] = {}; };
 
   // Tarjeta: retener y cobrar al aceptar.
@@ -114,5 +115,31 @@ const assert = require('assert');
   mk('b5', false); store['bookings/b5'].package = 'Boda';
   r = await call({ action: 'start', bookingId: 'b5', method: 'ath', phone: '7875550101' });
   assert.equal(r.code, 400);
+
+  // Paquete de restaurante: sin depósito, no se cobra nada.
+  store['artists/art1'].packages.push({ name: 'Cena', price: 180, kind: 'restaurante' });
+  mk('b6'); store['bookings/b6'].package = 'Cena';
+  r = await call({ action: 'start', bookingId: 'b6', method: 'ninguno' });
+  assert.equal(r.payment, 'sinPago');
+  assert.equal(store['bookings/b6'].amountCharged, 0);
+  assert.equal(store['bookings/b6'].total, 180);
+  r = await call({ action: 'accept', bookingId: 'b6' }, 'art1');
+  assert.equal(r.status, 'confirmada');
+  assert.equal(store['bookings/b6'].payment, 'sinPago');
+  mk('b7'); store['bookings/b7'].package = 'Cena';
+  await call({ action: 'start', bookingId: 'b7', method: 'ninguno' });
+  r = await call({ action: 'reject', bookingId: 'b7' }, 'art1');
+  assert.equal(r.payment, 'sinPago');
+
+  // Un paquete de actividad no se puede reservar sin depósito.
+  mk('b8');
+  r = await call({ action: 'start', bookingId: 'b8', method: 'ninguno' });
+  assert.equal(r.code, 400);
+
+  // Artista sin suscripción ni mes gratis: no se le puede reservar.
+  store['subscriptions/art1'] = { status: 'canceled', trialEnd: Date.now() - 1000, paidUntil: Date.now() + 86400000 };
+  mk('b9');
+  r = await call({ action: 'start', bookingId: 'b9', method: 'tarjeta' });
+  assert.equal(r.code, 409);
   console.log('Todas las pruebas del servidor pasaron');
 })().catch((e) => { console.error(e); process.exit(1); });

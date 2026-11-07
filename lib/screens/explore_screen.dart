@@ -28,8 +28,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
     final q = _query.toLowerCase();
     final list =
         state.artists.where((a) {
-          // Un artista aparece cuando ya publicó al menos un precio.
-          if (a.packages.isEmpty) return false;
+          // Un artista aparece cuando ya publicó al menos un precio y está
+          // suscrito (o en su mes gratis).
+          if (!a.listed) return false;
           if (_category != null && a.category != _category) return false;
           if (_instrument != null && !a.instruments.contains(_instrument)) {
             return false;

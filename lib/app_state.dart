@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -15,6 +17,32 @@ class AppState extends ChangeNotifier {
     final sofia = artists.firstWhere((a) => a.id == 'a1')
       ..email = demoArtistEmail;
     _seedBookings(sofia);
+    // Un evento que ya pasó, para probar las reseñas como Restaurante El Patio.
+    final past = DateTime.now().subtract(const Duration(days: 5));
+    bookings.add(
+      Booking(
+        id: 'seed-pasada',
+        artist: sofia,
+        package: sofia.packages.first.name,
+        eventType: EventType.restaurante,
+        date: DateTime(past.year, past.month, past.day),
+        time: const TimeOfDay(hour: 19, minute: 0),
+        venue: 'Restaurante El Patio, Calle Ruiz Belvis 10',
+        clientName: 'Restaurante El Patio',
+        clientType: ClientType.restaurante,
+        clientEmail: demoClientEmail,
+        notes: '',
+        total: sofia.packages.first.price,
+        amountCharged: 0,
+        payDeposit: false,
+        noDeposit: true,
+        cardLast4: '',
+        status: BookingStatus.confirmada,
+        payment: PaymentStatus.sinPago,
+        paymentMethod: PaymentMethod.ninguno,
+        hours: sofia.packages.first.hours,
+      ),
+    );
     accounts.addAll([
       Account(
         role: UserRole.cliente,
@@ -118,6 +146,7 @@ class AppState extends ChangeNotifier {
   Future<String?> register(Account a, String password) async {
     if (cloud != null) return cloud!.register(a, password);
     if (emailTaken(a.email)) return 'Ya existe una cuenta con ese correo';
+    a.artist?.createdAt = DateTime.now();
     signIn(a);
     return null;
   }
@@ -322,9 +351,14 @@ class AppState extends ChangeNotifier {
   }
 
   /// Reserva con pago simulado (modo demo o servidor de pagos sin configurar):
-  /// se guarda y se avisa al artista enseguida.
+  /// se guarda y se avisa al artista enseguida. Las de restaurante quedan sin
+  /// pago (en la nube se marcan como simuladas para poder cambiarlas).
   void addBooking(Booking b) {
-    if (online) b.payment = PaymentStatus.simulado;
+    if (online) {
+      b.payment = PaymentStatus.simulado;
+    } else if (b.noDeposit) {
+      b.payment = PaymentStatus.sinPago;
+    }
     bookings.insert(0, b);
     cloud?.saveBooking(b);
     notifyArtist(b);
@@ -337,6 +371,21 @@ class AppState extends ChangeNotifier {
     bookings.insert(0, b);
     notifyListeners();
     await cloud!.saveBooking(b);
+  }
+
+  /// Reserva de un paquete de restaurante con el servidor de pagos activo: se
+  /// guarda y el servidor comprueba que de verdad no lleva depósito.
+  Future<String?> bookWithoutDeposit(Booking b) async {
+    try {
+      await createUnpaidBooking(b);
+      await cloud!.pay('start', b, {'method': PaymentMethod.ninguno.name});
+      return null;
+    } on PayError catch (e) {
+      unawaited(cancelBooking(b));
+      return e.message;
+    } catch (_) {
+      return 'No se pudo guardar la reserva. Intenta otra vez.';
+    }
   }
 
   /// Le avisa al artista que tiene una solicitud nueva.
@@ -389,7 +438,10 @@ class AppState extends ChangeNotifier {
     _notifyClient(
       b,
       '${b.artist.name} aceptó tu reserva',
-      'Tu reserva quedó confirmada. Se cobró el pago retenido.',
+      b.noDeposit
+          ? 'Tu reserva quedó confirmada. El pago se arregla directo con el '
+                'artista.'
+          : 'Tu reserva quedó confirmada. Se cobró el pago retenido.',
     );
     return null;
   }
@@ -411,6 +463,8 @@ class AppState extends ChangeNotifier {
       b.payment == PaymentStatus.reembolsado
           ? 'Te devolvimos el pago por ATH Móvil. Puedes buscar otro artista '
                 'para esa fecha.'
+          : b.noDeposit
+          ? 'Puedes buscar otro artista para esa fecha.'
           : 'No se cobró nada. Puedes buscar otro artista para esa fecha.',
     );
     return null;
@@ -428,6 +482,105 @@ class AppState extends ChangeNotifier {
     }
     notifyListeners();
     return null;
+  }
+
+  // ---------- Reseñas ----------
+
+  /// Reseña que el cliente dejó para esta reserva, si ya la dejó.
+  Review? reviewFor(Booking b) =>
+      b.artist.reviewList.where((r) => r.id == b.id).firstOrNull;
+
+  /// El cliente con la sesión abierta puede reseñar esta reserva.
+  bool canReview(Booking b) =>
+      !isArtist &&
+      b.reviewable &&
+      b.clientEmail.toLowerCase() == account?.email.toLowerCase();
+
+  /// Guarda o cambia la reseña de una reserva. Devuelve un error o null.
+  Future<String?> saveReview(Booking b, int rating, String text) async {
+    if (!canReview(b)) return 'Solo puedes reseñar eventos que ya pasaron.';
+    final existing = reviewFor(b);
+    final review =
+        existing ??
+        Review(
+          id: b.id,
+          artistId: b.artist.id,
+          clientUid: uid,
+          clientName: b.clientName,
+          rating: rating,
+          text: text,
+        );
+    final before = (review.rating, review.text);
+    review
+      ..rating = rating
+      ..text = text;
+    if (existing == null) b.artist.reviewList.insert(0, review);
+    notifyListeners();
+    try {
+      await cloud?.saveReview(review);
+    } catch (_) {
+      if (existing == null) {
+        b.artist.reviewList.remove(review);
+      } else {
+        review
+          ..rating = before.$1
+          ..text = before.$2;
+      }
+      notifyListeners();
+      return 'No se pudo guardar la reseña. Revisa tu conexión.';
+    }
+    notify(
+      AppNotification(
+        recipientEmail: b.artist.email,
+        title:
+            '${b.clientName} te dejó $rating '
+            '${rating == 1 ? 'estrella' : 'estrellas'}',
+        body: text.isEmpty ? 'Mira tus reseñas en la app.' : text,
+      ),
+    );
+    return null;
+  }
+
+  // ---------- Suscripción del artista ----------
+
+  /// Abre el cobro de la suscripción. Devuelve la dirección de Stripe para
+  /// poner la tarjeta, o null si se activó sin cobrar (demo o servidor sin
+  /// Stripe). Lanza [PayError] si el servidor falla.
+  Future<Uri?> startSubscription() async {
+    final me = myArtistProfile;
+    if (cloud == null) {
+      // Modo demo: se activa sin cobrar.
+      final s = me.effectiveSubscription;
+      me.subscription = Subscription(
+        status: s.inTrial ? 'trialing' : 'active',
+        trialEnd: s.trialEnd,
+        paidUntil: (s.inTrial ? s.trialEnd : DateTime.now()).add(
+          const Duration(days: 30),
+        ),
+        simulated: true,
+      );
+      notifyListeners();
+      return null;
+    }
+    final d = await cloud!.subscription('checkout');
+    final url = d['url'] as String?;
+    return url == null ? null : Uri.parse(url);
+  }
+
+  /// Cancela al final del mes pagado ([resume] la deja seguir).
+  Future<String?> setSubscriptionCanceled(bool cancel) async {
+    final me = myArtistProfile;
+    if (cloud == null) {
+      me.subscription?.cancelAtPeriodEnd = cancel;
+      notifyListeners();
+      return null;
+    }
+    try {
+      await cloud!.subscription(cancel ? 'cancel' : 'resume');
+      return null;
+    } on PayError catch (e) {
+      return e.message;
+    }
   }
 
   void savePackage(Artist a, PricePackage p, {PricePackage? replacing}) {

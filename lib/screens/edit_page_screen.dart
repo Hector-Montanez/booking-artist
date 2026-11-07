@@ -261,7 +261,11 @@ class _EditPageScreenState extends State<EditPageScreen> {
           const SizedBox(height: 24),
           Text('Condiciones de reserva', style: theme.textTheme.titleMedium),
           const SizedBox(height: 4),
-          Text('Depósito para reservar: ${_me.depositPercent}% del total'),
+          Text(
+            'Depósito para reservar: ${_me.depositPercent}% del total. Solo '
+            'se pide en los paquetes de actividades; los de restaurante no '
+            'llevan depósito.',
+          ),
           Slider(
             value: _me.depositPercent.toDouble(),
             min: 10,

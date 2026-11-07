@@ -11,7 +11,9 @@ Para todo Puerto Rico (la primera prueba fue en Caguas). Usa datos de ejemplo: s
 - **Explorar**: artistas cerca de ti, búsqueda por nombre o género, filtros por tipo de artista y de evento, orden por distancia, precio o valoración.
 - **Perfil del artista**: biografía, géneros, precios fijados por el artista, videos y redes (enlaces públicos que el artista pega).
 - **Reservar y pagar**: paquete, tipo de evento, fecha, hora, lugar y notas; el cliente lee y acepta las condiciones del artista (depósito y cancelación) y paga el depósito o el total con tarjeta (Stripe) o ATH Móvil. Con tarjeta el dinero queda retenido y se cobra solo si el artista acepta; si rechaza, se libera. ATH Móvil cobra al momento y se reembolsa si el artista rechaza o el cliente cancela. Tarifa de la plataforma: 10 %. Tarjeta de prueba: 4242 4242 4242 4242.
-- **Mis reservas**: estado de cada solicitud (pendiente, confirmada, cancelada).
+- **Mis reservas**: estado de cada solicitud (pendiente, confirmada, cancelada). Después de un evento confirmado, el cliente puede dejarle **estrellas (1 a 5) y una reseña** al artista; se ven en su página y en su panel.
+- **Paquetes de restaurante o de actividades**: el artista marca cada paquete. Los de **actividades** (bodas, cumpleaños, eventos) piden depósito; los de **restaurante** son solo la reserva: no se paga nada por la app ni hay tarifa, y el pago se arregla directo con el artista.
+- **Suscripción del artista**: $10 al mes para aparecer en la app, con el **primer mes gratis** desde que crea su cuenta (sin pedir tarjeta). Si se suscribe durante el mes gratis, Stripe no cobra hasta que termine. Si se acaba el mes gratis sin suscribirse, o cancela, su página deja de salir en Explorar y no se le puede reservar.
 - **Solicitudes (artista)**: el artista edita sus precios, añade enlaces de YouTube/Instagram/TikTok y acepta o rechaza solicitudes, viendo si vienen de un cliente privado o de un restaurante.
 
 - **Disponibilidad**: el artista define su horario semanal (qué días y de qué hora a qué hora), sus días libres y el tiempo que necesita entre eventos. Al reservar, el cliente solo puede escoger días y horas libres; las reservas pendientes o confirmadas bloquean ese horario.
@@ -89,6 +91,12 @@ Para ver qué canales están activos, abre `https://booking-artist-khaki.vercel.
 Variables de entorno en Vercel: `STRIPE_SECRET_KEY` (`sk_test_...` para pruebas), `ATHM_PUBLIC_TOKEN`, `ATHM_PRIVATE_TOKEN`, `FEE_RATE` (opcional, 0.10) y las de arriba. En el teléfono la app llama a `https://booking-artist-khaki.vercel.app/api/...`; se cambia con `--dart-define=API_URL=https://...`.
 
 Pruebas del servidor (sin internet ni llaves): `node vercel/test/pay.test.js`.
+
+## Suscripción de artistas ($10 al mes)
+
+`vercel/api/subscribe.js` (copiado en `api/subscribe.js`) maneja la suscripción con Stripe Billing. El estado vive en Firestore en `subscriptions/{uid}` (todos lo leen, solo el servidor lo escribe) y el cliente de Stripe en `billing/{uid}` (solo el servidor). Usa las mismas variables que los cobros (`FIREBASE_SERVICE_ACCOUNT`, `STRIPE_SECRET_KEY`); opcional `STRIPE_PRICE_ID` si prefieres crear el precio de $10/mes en Stripe. Sin `STRIPE_SECRET_KEY` la suscripción se activa en modo de prueba (no cobra).
+
+Para que los cobros de cada mes (o una tarjeta rechazada) se reflejen solos, en Stripe → Desarrolladores → Webhooks añade `https://booking-artist-khaki.vercel.app/api/subscribe` con los eventos `customer.subscription.*` e `invoice.payment_failed`. El servidor no confía en el aviso: vuelve a leer la suscripción en Stripe. Pruebas sin internet: `node vercel/test/subscribe.test.js`.
 
 ## Publicación web
 

@@ -97,7 +97,7 @@ class RatingLabel extends StatelessWidget {
         const Icon(Icons.star_rounded, size: 18, color: Color(0xFFFFB300)),
         const SizedBox(width: 2),
         Text(
-          '${artist.rating}',
+          artist.rating.toStringAsFixed(1),
           style: const TextStyle(fontWeight: FontWeight.w600),
         ),
         Text(
@@ -152,6 +152,97 @@ class ArtistCoverImage extends StatelessWidget {
       fit: BoxFit.cover,
       webHtmlElementStrategy: WebHtmlElementStrategy.fallback,
       errorBuilder: (_, _, _) => fallback,
+    );
+  }
+}
+
+const starColor = Color(0xFFFFB300);
+
+/// Estrellas de una reseña (solo para ver).
+class Stars extends StatelessWidget {
+  const Stars({super.key, required this.rating, this.size = 18});
+
+  final int rating;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      for (var i = 1; i <= 5; i++)
+        Icon(
+          i <= rating ? Icons.star_rounded : Icons.star_outline_rounded,
+          size: size,
+          color: starColor,
+        ),
+    ],
+  );
+}
+
+/// Estrellas que se tocan para escoger de 1 a 5.
+class StarPicker extends StatelessWidget {
+  const StarPicker({super.key, required this.value, required this.onChanged});
+
+  final int value;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisAlignment: MainAxisAlignment.center,
+    children: [
+      for (var i = 1; i <= 5; i++)
+        IconButton(
+          tooltip: '$i ${i == 1 ? 'estrella' : 'estrellas'}',
+          iconSize: 40,
+          onPressed: () => onChanged(i),
+          icon: Icon(
+            i <= value ? Icons.star_rounded : Icons.star_outline_rounded,
+            color: starColor,
+          ),
+        ),
+    ],
+  );
+}
+
+/// Una reseña: quién, estrellas, cuándo y lo que escribió.
+class ReviewTile extends StatelessWidget {
+  const ReviewTile({super.key, required this.review});
+
+  final Review review;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    review.clientName,
+                    style: theme.textTheme.titleSmall,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Text(
+                  DateFormat.yMMMd('es').format(review.createdAt),
+                  style: theme.textTheme.bodySmall,
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Stars(rating: review.rating, size: 16),
+            if (review.text.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(review.text),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }
