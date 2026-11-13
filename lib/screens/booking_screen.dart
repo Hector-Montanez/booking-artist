@@ -21,13 +21,13 @@ class BookingScreen extends StatefulWidget {
 
 class _BookingScreenState extends State<BookingScreen> {
   final _form = GlobalKey<FormState>();
-  late PricePackage _package =
-      widget.initialPackage ?? widget.artist.packages.first;
+  late PricePackage _package = widget.initialPackage ?? _defaultPackage();
   late EventType _eventType = _defaultEventType();
   DateTime? _date;
   TimeOfDay? _time;
   bool _accepted = false;
   bool _payDeposit = true;
+  bool _sending = false;
 
   // Se llenan con los datos de la cuenta; el cliente puede cambiarlos.
   late final Account? _account = AppScope.of(context).account;
@@ -46,8 +46,32 @@ class _BookingScreenState extends State<BookingScreen> {
   /// (FEE_RATE en Vercel) y es el que decide el monto final.
   static const _feeRate = 0.10;
 
+  /// Un restaurante empieza con un paquete de restaurante, si el artista
+  /// tiene uno.
+  PricePackage _defaultPackage() {
+    final packages = widget.artist.packages;
+    if (AppScope.of(context).account?.clientType == ClientType.restaurante) {
+      return packages.where((p) => !p.takesDeposit).firstOrNull ??
+          packages.first;
+    }
+    return packages.first;
+  }
+
+  /// Paquete de restaurante: sin depósito, solo la reserva.
+  bool get _noDeposit => !_package.takesDeposit;
+
+  /// Tipos de evento que van con el paquete: los de restaurante son para
+  /// restaurantes; los de actividades, para todo lo demás.
+  List<EventType> get _eventTypes {
+    if (_noDeposit) return const [EventType.restaurante];
+    final types = widget.artist.eventTypes
+        .where((e) => e != EventType.restaurante)
+        .toList();
+    return types.isEmpty ? const [EventType.actividad] : types;
+  }
+
   EventType _defaultEventType() {
-    final types = widget.artist.eventTypes;
+    final types = _eventTypes;
     final account = AppScope.of(context).account;
     final preferred = switch (account?.clientType) {
       ClientType.restaurante => EventType.restaurante,
@@ -69,10 +93,14 @@ class _BookingScreenState extends State<BookingScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final artist = widget.artist;
-    final total = ((_package.price * (1 + _feeRate)) * 100).round() / 100;
+    // Sin depósito no se cobra nada por la app, ni la tarifa de servicio.
+    final noDeposit = _noDeposit;
+    final total = noDeposit
+        ? _package.price
+        : ((_package.price * (1 + _feeRate)) * 100).round() / 100;
     final fee = total - _package.price;
     final deposit = (total * artist.depositPercent / 100).roundToDouble();
-    final dueNow = _payDeposit ? deposit : total;
+    final dueNow = noDeposit ? 0.0 : (_payDeposit ? deposit : total);
     final dateFmt = DateFormat.yMMMMEEEEd('es');
 
     return Scaffold(
@@ -87,6 +115,9 @@ class _BookingScreenState extends State<BookingScreen> {
               groupValue: _package,
               onChanged: (v) => setState(() {
                 _package = v!;
+                if (!_eventTypes.contains(_eventType)) {
+                  _eventType = _eventTypes.first;
+                }
                 // Un paquete más largo puede no caber en la hora elegida.
                 if (_date != null && !_slots(_date!).contains(_time)) {
                   _time = null;
@@ -98,7 +129,9 @@ class _BookingScreenState extends State<BookingScreen> {
                     RadioListTile<PricePackage>(
                       value: p,
                       title: Text(p.name),
-                      subtitle: Text('${p.hours} h'),
+                      subtitle: Text(
+                        '${p.hours} h · ${p.takesDeposit ? 'Actividad, con depósito' : 'Restaurante, sin depósito'}',
+                      ),
                       secondary: Text(
                         money(p.price),
                         style: const TextStyle(fontWeight: FontWeight.bold),
@@ -111,7 +144,7 @@ class _BookingScreenState extends State<BookingScreen> {
               spacing: 8,
               runSpacing: 8,
               children: [
-                for (final e in artist.eventTypes)
+                for (final e in _eventTypes)
                   ChoiceChip(
                     avatar: Icon(e.icon, size: 18),
                     label: Text(e.label),
@@ -198,7 +231,9 @@ class _BookingScreenState extends State<BookingScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Depósito para reservar: ${artist.depositPercent}%',
+                      noDeposit
+                          ? 'Paquete de restaurante: sin depósito'
+                          : 'Depósito para reservar: ${artist.depositPercent}%',
                       style: theme.textTheme.titleSmall,
                     ),
                     const SizedBox(height: 4),
@@ -214,59 +249,81 @@ class _BookingScreenState extends State<BookingScreen> {
               contentPadding: EdgeInsets.zero,
               title: const Text('Acepto las condiciones del artista'),
             ),
-            _StepTitle(4, '¿Cuánto pagas ahora?'),
-            RadioGroup<bool>(
-              groupValue: _payDeposit,
-              onChanged: (v) => setState(() => _payDeposit = v!),
-              child: Column(
-                children: [
-                  RadioListTile<bool>(
-                    value: true,
-                    title: Text('Depósito del ${artist.depositPercent}%'),
-                    subtitle: Text(
-                      'El resto (${money(total - deposit)}) se paga por la app '
-                      'el día del evento.',
-                    ),
-                    secondary: Text(
-                      money(deposit),
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
+            if (noDeposit) ...[
+              _StepTitle(4, 'Sin depósito'),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      _row('Precio del artista', money(_package.price)),
+                      const Divider(),
+                      _row('A pagar ahora', money(0), bold: true),
+                    ],
                   ),
-                  RadioListTile<bool>(
-                    value: false,
-                    title: const Text('Pago completo'),
-                    secondary: Text(
-                      money(total),
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ],
+                ),
               ),
-            ),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
+              const SizedBox(height: 8),
+              Text(
+                'Los paquetes de restaurante no llevan depósito: solo reservas '
+                'la fecha. El pago se arregla directo con ${artist.name}.',
+                style: theme.textTheme.bodySmall,
+              ),
+            ] else ...[
+              _StepTitle(4, '¿Cuánto pagas ahora?'),
+              RadioGroup<bool>(
+                groupValue: _payDeposit,
+                onChanged: (v) => setState(() => _payDeposit = v!),
                 child: Column(
                   children: [
-                    _row('Precio del artista', money(_package.price)),
-                    _row(
-                      'Tarifa de servicio (${(_feeRate * 100).round()}%)',
-                      money(fee),
+                    RadioListTile<bool>(
+                      value: true,
+                      title: Text('Depósito del ${artist.depositPercent}%'),
+                      subtitle: Text(
+                        'El resto (${money(total - deposit)}) se paga por la app '
+                        'el día del evento.',
+                      ),
+                      secondary: Text(
+                        money(deposit),
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
                     ),
-                    _row('Total del evento', money(total)),
-                    const Divider(),
-                    _row('A pagar ahora', money(dueNow), bold: true),
+                    RadioListTile<bool>(
+                      value: false,
+                      title: const Text('Pago completo'),
+                      secondary: Text(
+                        money(total),
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
                   ],
                 ),
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Pagas con tarjeta o ATH Móvil. Con tarjeta no se cobra nada '
-              'hasta que ${artist.name} acepte; con ATH Móvil, si rechaza, te '
-              'devolvemos el dinero.',
-              style: theme.textTheme.bodySmall,
-            ),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      _row('Precio del artista', money(_package.price)),
+                      _row(
+                        'Tarifa de servicio (${(_feeRate * 100).round()}%)',
+                        money(fee),
+                      ),
+                      _row('Total del evento', money(total)),
+                      const Divider(),
+                      _row('A pagar ahora', money(dueNow), bold: true),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Pagas con tarjeta o ATH Móvil. Con tarjeta no se cobra nada '
+                'hasta que ${artist.name} acepte; con ATH Móvil, si rechaza, te '
+                'devolvemos el dinero.',
+                style: theme.textTheme.bodySmall,
+              ),
+            ],
           ],
         ),
       ),
@@ -277,9 +334,15 @@ class _BookingScreenState extends State<BookingScreen> {
             style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(52),
             ),
-            icon: const Icon(Icons.lock),
-            onPressed: () => _continueToPayment(total, dueNow),
-            label: Text('Continuar al pago · ${money(dueNow)}'),
+            icon: Icon(noDeposit ? Icons.send : Icons.lock),
+            onPressed: _sending
+                ? null
+                : () => _continueToPayment(total, dueNow),
+            label: Text(
+              noDeposit
+                  ? 'Enviar solicitud'
+                  : 'Continuar al pago · ${money(dueNow)}',
+            ),
           ),
         ),
       ),
@@ -374,9 +437,29 @@ class _BookingScreenState extends State<BookingScreen> {
       notes: _notes.text.trim(),
       total: total,
       amountCharged: dueNow,
-      payDeposit: _payDeposit,
+      payDeposit: !_noDeposit && _payDeposit,
+      noDeposit: _noDeposit,
+      paymentMethod: _noDeposit ? PaymentMethod.ninguno : PaymentMethod.tarjeta,
       cardLast4: '',
     );
+
+    if (_noDeposit) {
+      // Paquete de restaurante: no hay pago, solo la solicitud.
+      String? error;
+      if (state.serverPayments) {
+        setState(() => _sending = true);
+        error = await state.bookWithoutDeposit(booking);
+        if (!mounted) return;
+        setState(() => _sending = false);
+        if (error == null) state.notifyArtist(booking);
+      } else {
+        state.addBooking(booking);
+      }
+      if (error != null) return _snack(error);
+      await showPaidDialog(context, booking);
+      if (mounted) Navigator.of(context).popUntil((r) => r.isFirst);
+      return;
+    }
 
     // Con cobro real la reserva se guarda primero (sin pagar) y el servidor
     // la marca como pagada.
@@ -422,7 +505,10 @@ class _BookingScreenState extends State<BookingScreen> {
 Future<void> showPaidDialog(BuildContext context, Booking b) {
   final amount = money(b.amountCharged);
   final name = b.artist.name;
-  final how = b.paymentMethod == PaymentMethod.ath
+  final how = b.noDeposit
+      ? 'No pagaste nada: es un paquete de restaurante, sin depósito. El pago '
+            'se arregla directo con $name.'
+      : b.paymentMethod == PaymentMethod.ath
       ? 'Pagaste $amount con ATH Móvil. Si $name no acepta, te devolvemos el '
             'dinero.'
       : 'Retuvimos $amount en tu tarjeta${b.cardLast4.isEmpty ? '' : ' terminada en ${b.cardLast4}'}. '

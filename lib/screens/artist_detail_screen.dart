@@ -146,9 +146,7 @@ class ArtistDetailScreen extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         const Icon(Icons.place, size: 16),
-                        Text(
-                          ' ${artist.distanceKm} km · ${artist.zone}',
-                        ),
+                        Text(' ${artist.distanceKm} km · ${artist.zone}'),
                       ],
                     ),
                   ],
@@ -213,10 +211,12 @@ class ArtistDetailScreen extends StatelessWidget {
                       title: Text(p.name),
                       subtitle: Text(
                         [
-                          '${_hours(p.hours)} de presentación',
+                          '${_hours(p.hours)} de presentación · '
+                              '${p.takesDeposit ? 'Actividad (depósito ${artist.depositPercent}%)' : 'Restaurante (sin depósito)'}',
                           if (p.description.isNotEmpty) p.description,
                         ].join('\n'),
                       ),
+                      leading: Icon(p.kind.icon),
                       isThreeLine: p.description.isNotEmpty,
                       trailing: Text(
                         money(p.price),
@@ -238,18 +238,56 @@ class ArtistDetailScreen extends StatelessWidget {
                       child: Row(
                         children: [
                           SizedBox(width: 110, child: Text(weekdayNames[day]!)),
-                          Text(
-                            '${formatMinutes(context, h.start)} a '
-                            '${formatMinutes(context, h.end)}',
+                          Expanded(
+                            child: Text(
+                              '${formatMinutes(context, h.start)} a '
+                              '${formatMinutes(context, h.end)}',
+                            ),
                           ),
                         ],
                       ),
                     ),
                 const _SectionTitle('Condiciones'),
                 Text(
-                  'Depósito para reservar: ${artist.depositPercent}% del total. '
-                  '${artist.conditions}',
+                  [
+                    if (artist.takesDeposits)
+                      'Paquetes de actividades: depósito de '
+                          '${artist.depositPercent}% del total para reservar.',
+                    if (artist.packages.any((p) => !p.takesDeposit))
+                      'Paquetes de restaurante: sin depósito, solo la reserva.',
+                    artist.conditions,
+                  ].join(' '),
                 ),
+                const _SectionTitle('Reseñas'),
+                if (artist.reviews == 0)
+                  const Text(
+                    'Todavía no tiene reseñas. Los clientes que lo contraten '
+                    'podrán dejarle estrellas después del evento.',
+                  )
+                else ...[
+                  Row(
+                    children: [
+                      Text(
+                        artist.rating.toStringAsFixed(1),
+                        style: theme.textTheme.headlineMedium,
+                      ),
+                      const SizedBox(width: 8),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Stars(rating: artist.rating.round()),
+                          Text(
+                            '${artist.reviews} '
+                            '${artist.reviews == 1 ? 'reseña' : 'reseñas'}',
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  for (final r in artist.reviewList.take(10))
+                    ReviewTile(review: r),
+                ],
                 if (artist.gallery.isNotEmpty) ...[
                   const _SectionTitle('Fotos'),
                   SizedBox(

@@ -19,6 +19,7 @@
 // Si falta la llave de un método, ese método funciona en modo simulado (no cobra).
 
 const admin = require('firebase-admin');
+const subscription = require('./subscribe.js');
 
 const FEE_RATE = Number(process.env.FEE_RATE || 0.1);
 const ATHM_URL = 'https://payments.athmovil.com/api/business-transaction/ecommerce';
@@ -46,11 +47,15 @@ class Fail extends Error {
 
 const round2 = (n) => Math.round(n * 100) / 100;
 
-/** Mismo cálculo que la app (booking_screen.dart), hecho con los datos del servidor. */
+/**
+ * Mismo cálculo que la app (booking_screen.dart), hecho con los datos del servidor.
+ * Los paquetes de restaurante no llevan depósito ni tarifa: solo se reserva.
+ */
 function amounts(artist, packageName, payDeposit) {
   const pkg = (artist.packages || []).find((p) => p.name === packageName);
   if (!pkg) throw new Fail(400, 'El paquete ya no existe');
   const price = Number(pkg.price);
+  if (pkg.kind === 'restaurante') return { price, fee: 0, total: price, dueNow: 0, noDeposit: true };
   const total = round2(price * (1 + FEE_RATE));
   const pct = Number(artist.depositPercent ?? 30);
   const deposit = Math.round((total * pct) / 100);
@@ -129,9 +134,20 @@ async function start(req, db, caller, body) {
 
   const artist = (await db.collection('artists').doc(b.artistId).get()).data();
   if (!artist) throw new Fail(404, 'El artista ya no existe');
+  // Solo se reserva a artistas suscritos o en su mes gratis.
+  let sub = (await db.collection('subscriptions').doc(b.artistId).get()).data();
+  if (!sub) sub = { trialEnd: await subscription.trialEndFor(db, b.artistId) };
+  if (!subscription.visible(sub)) throw new Fail(409, 'Este artista no está recibiendo reservas ahora');
   const m = amounts(artist, b.package, b.payDeposit !== false);
   const concept = `${b.package} · ${artist.name}`.slice(0, 80);
   const common = { total: m.total, amountCharged: m.dueNow, fee: m.fee };
+
+  // Paquete de restaurante: no se cobra nada, la reserva pasa directo al artista.
+  if (m.noDeposit) {
+    await ref.update({ ...common, noDeposit: true, payDeposit: false, paymentMethod: 'ninguno', cardLast4: '', payment: 'sinPago' });
+    return { payment: 'sinPago', amount: 0 };
+  }
+  if (body.method === 'ninguno') throw new Fail(400, 'Este paquete pide depósito para reservar');
 
   let method = body.method;
   if ((method === 'tarjeta' && !has.card()) || (method === 'ath' && !has.ath())) method = 'prueba';
@@ -306,6 +322,10 @@ async function decide(db, caller, body) {
   if (b.status !== 'pendiente') throw new Fail(409, 'Esta reserva ya fue respondida');
 
   if (action === 'accept') {
+    if (b.payment === 'sinPago') {
+      await ref.update({ status: 'confirmada' });
+      return { status: 'confirmada', payment: 'sinPago' };
+    }
     if (!['retenido', 'pagado'].includes(b.payment)) throw new Fail(409, 'El cliente todavía no ha pagado');
     if (secret.method === 'tarjeta' && secret.stripeIntent) {
       try {
@@ -319,7 +339,7 @@ async function decide(db, caller, body) {
     return { status: 'confirmada', payment: 'cobrado' };
   }
 
-  const payment = await release(b, secret);
+  const payment = b.payment === 'sinPago' ? 'sinPago' : await release(b, secret);
   const st = action === 'cancel' ? 'cancelada' : 'rechazada';
   await ref.update({ status: st, payment });
   await db.collection('busy').doc(ref.id).delete();

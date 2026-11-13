@@ -77,6 +77,29 @@ extension EventTypeInfo on EventType {
   };
 }
 
+/// Para qué es un paquete. Los de actividades piden depósito; los de
+/// restaurante son solo la reserva, sin pagar nada por la app.
+enum PackageKind { actividad, restaurante }
+
+extension PackageKindInfo on PackageKind {
+  String get label => switch (this) {
+    PackageKind.actividad => 'Actividad o evento',
+    PackageKind.restaurante => 'Restaurante',
+  };
+
+  String get description => switch (this) {
+    PackageKind.actividad =>
+      'Bodas, cumpleaños, actividades. El cliente deja un depósito.',
+    PackageKind.restaurante =>
+      'Sin depósito: el cliente solo reserva la fecha.',
+  };
+
+  IconData get icon => switch (this) {
+    PackageKind.actividad => Icons.celebration,
+    PackageKind.restaurante => Icons.restaurant,
+  };
+}
+
 /// Paquete con precio fijado por el propio artista.
 class PricePackage {
   PricePackage({
@@ -84,12 +107,97 @@ class PricePackage {
     required this.price,
     required this.hours,
     this.description = '',
+    this.kind = PackageKind.actividad,
   });
 
   String name;
   double price;
   double hours;
   String description;
+  PackageKind kind;
+
+  /// Solo los paquetes de actividades piden depósito al reservar.
+  bool get takesDeposit => kind == PackageKind.actividad;
+}
+
+/// Reseña que deja un cliente después de un evento confirmado. Una por
+/// reserva (su id es el de la reserva).
+class Review {
+  Review({
+    required this.id,
+    required this.artistId,
+    required this.clientUid,
+    required this.clientName,
+    required this.rating,
+    required this.text,
+    DateTime? createdAt,
+  }) : createdAt = createdAt ?? DateTime.now();
+
+  final String id;
+  final String artistId;
+  final String clientUid;
+  final String clientName;
+
+  /// Estrellas, de 1 a 5.
+  int rating;
+  String text;
+  DateTime createdAt;
+}
+
+/// Precio de la suscripción del artista y días de prueba gratis. El servidor
+/// (/api/subscribe) usa los mismos valores.
+const subscriptionPrice = 10.0;
+const trialDays = 30;
+
+/// Fecha desde la que cuentan los días gratis de los artistas que ya tenían
+/// cuenta antes de que existiera la suscripción.
+final subscriptionLaunch = DateTime(2026, 11, 7);
+
+/// Suscripción mensual del artista. Sin ella (o sin la prueba gratis) su
+/// página no aparece en la app. Solo el servidor la cambia.
+class Subscription {
+  Subscription({
+    required this.status,
+    required this.trialEnd,
+    this.paidUntil,
+    this.cancelAtPeriodEnd = false,
+    this.simulated = false,
+  });
+
+  /// Estado en Stripe: sinTarjeta (prueba sin suscribirse), trialing, active,
+  /// past_due, canceled…
+  String status;
+  DateTime trialEnd;
+
+  /// Hasta cuándo está pagada (fin del periodo actual).
+  DateTime? paidUntil;
+  bool cancelAtPeriodEnd;
+
+  /// Activada sin cobrar (servidor sin llave de Stripe, o modo demo).
+  bool simulated;
+
+  /// Ya puso su tarjeta (está suscrito, aunque siga en la prueba).
+  bool get subscribed =>
+      status == 'trialing' || status == 'active' || status == 'past_due';
+
+  bool get inTrial => DateTime.now().isBefore(trialEnd);
+
+  /// Hasta cuándo aparece en la app.
+  DateTime get visibleUntil {
+    final paid = subscribed ? paidUntil : null;
+    // Si un cobro falla, Stripe reintenta unos días: se deja ese margen.
+    final grace = status == 'past_due'
+        ? paid?.add(const Duration(days: 7))
+        : paid;
+    return grace != null && grace.isAfter(trialEnd) ? grace : trialEnd;
+  }
+
+  bool get visible => DateTime.now().isBefore(visibleUntil);
+
+  int get trialDaysLeft {
+    final h = trialEnd.difference(DateTime.now()).inHours;
+    return h <= 0 ? 0 : (h / 24).ceil();
+  }
 }
 
 enum LinkKind { youtube, instagram, tiktok, spotify, facebook, web }
@@ -141,8 +249,8 @@ class Artist {
     required this.bio,
     required this.zone,
     required this.distanceKm,
-    required this.rating,
-    required this.reviews,
+    required double rating,
+    required int reviews,
     required this.color,
     required this.packages,
     required this.links,
@@ -157,7 +265,11 @@ class Artist {
     this.email = '',
     Map<int, DayHours>? weeklyHours,
     this.bufferMinutes = 60,
-  }) : instruments = instruments ?? [],
+    this.createdAt,
+    this.subscription,
+  }) : baseRating = rating,
+       baseReviews = reviews,
+       instruments = instruments ?? [],
        weeklyHours = weeklyHours ?? defaultWeeklyHours();
 
   /// En la nube es el id de la cuenta del artista.
@@ -168,8 +280,50 @@ class Artist {
   String bio;
   final String zone;
   final double distanceKm;
-  final double rating;
-  final int reviews;
+
+  /// Valoración de ejemplo (artistas de la demo). Se combina con las reseñas
+  /// reales de [reviewList].
+  final double baseRating;
+  final int baseReviews;
+
+  /// Reseñas que dejaron los clientes en la app.
+  final List<Review> reviewList = [];
+
+  int get reviews => baseReviews + reviewList.length;
+
+  /// Promedio de estrellas, con un decimal.
+  double get rating {
+    if (reviews == 0) return 0;
+    final sum =
+        baseRating * baseReviews +
+        reviewList.fold<int>(0, (s, r) => s + r.rating);
+    return (sum / reviews * 10).round() / 10;
+  }
+
+  /// Cuándo creó su cuenta (los días gratis cuentan desde ahí).
+  DateTime? createdAt;
+
+  /// Suscripción guardada por el servidor. Si falta, se calcula la prueba
+  /// gratis desde [createdAt].
+  Subscription? subscription;
+
+  /// Fin de la prueba gratis si el servidor todavía no la registró.
+  DateTime get trialEnd {
+    final start = createdAt ?? subscriptionLaunch;
+    return (start.isAfter(subscriptionLaunch) ? start : subscriptionLaunch).add(
+      const Duration(days: trialDays),
+    );
+  }
+
+  Subscription get effectiveSubscription =>
+      subscription ?? Subscription(status: 'sinTarjeta', trialEnd: trialEnd);
+
+  /// Aparece en Explorar: tiene al menos un precio y está suscrito o en su
+  /// mes gratis.
+  bool get listed => packages.isNotEmpty && effectiveSubscription.visible;
+
+  /// Pide depósito en al menos uno de sus paquetes.
+  bool get takesDeposits => packages.any((p) => p.takesDeposit);
   Color color;
   final List<PricePackage> packages;
   final List<MediaLink> links;
@@ -299,6 +453,9 @@ enum PaymentStatus {
 
   /// Pago de prueba hecho sin servidor de pagos: no se cobró nada.
   simulado,
+
+  /// Paquete de restaurante: solo se reserva, no se paga nada por la app.
+  sinPago,
 }
 
 extension PaymentStatusInfo on PaymentStatus {
@@ -310,17 +467,19 @@ extension PaymentStatusInfo on PaymentStatus {
     PaymentStatus.liberado => 'No se cobró nada',
     PaymentStatus.reembolsado => 'Reembolsado',
     PaymentStatus.simulado => 'Pago de prueba (no se cobró)',
+    PaymentStatus.sinPago => 'Sin depósito: solo reserva',
   };
 }
 
 /// Formas de pago.
-enum PaymentMethod { tarjeta, ath, prueba }
+enum PaymentMethod { tarjeta, ath, prueba, ninguno }
 
 extension PaymentMethodInfo on PaymentMethod {
   String get label => switch (this) {
     PaymentMethod.tarjeta => 'Tarjeta',
     PaymentMethod.ath => 'ATH Móvil',
     PaymentMethod.prueba => 'Pago de prueba',
+    PaymentMethod.ninguno => 'Sin pago por la app',
   };
 }
 
@@ -346,6 +505,7 @@ class Booking {
     this.paymentMethod = PaymentMethod.tarjeta,
     this.hours = 2,
     this.clientUid = '',
+    this.noDeposit = false,
   });
 
   final String id;
@@ -371,6 +531,10 @@ class Booking {
   double amountCharged;
   final bool payDeposit;
 
+  /// Paquete de restaurante: se reservó sin depósito y sin pagar por la app;
+  /// el pago se arregla directo con el artista.
+  final bool noDeposit;
+
   /// Últimos 4 dígitos de la tarjeta, o del teléfono de ATH Móvil.
   String cardLast4;
   PaymentStatus payment;
@@ -383,6 +547,7 @@ class Booking {
     PaymentMethod.ath =>
       cardLast4.isEmpty ? 'ATH Móvil' : 'ATH Móvil (tel. •••• $cardLast4)',
     PaymentMethod.prueba => 'Pago de prueba',
+    PaymentMethod.ninguno => 'Sin depósito',
   };
 
   /// Duración del paquete reservado.
@@ -397,6 +562,10 @@ class Booking {
       status == BookingStatus.pendiente || status == BookingStatus.confirmada;
 
   double get balance => total - amountCharged;
+
+  /// El evento ya pasó y el artista lo había confirmado: se puede reseñar.
+  bool get reviewable =>
+      status == BookingStatus.confirmada && end.isBefore(DateTime.now());
 }
 
 enum ClientType { privado, restaurante, agrupacion }

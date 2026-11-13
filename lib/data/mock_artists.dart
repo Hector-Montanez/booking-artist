@@ -14,7 +14,47 @@ String _photo(String id) =>
 String _yt(String q) =>
     'https://www.youtube.com/results?search_query=${Uri.encodeQueryComponent(q)}';
 
-List<Artist> buildMockArtists() => [
+/// Artistas de ejemplo. Tienen la suscripción activa (simulada) para que
+/// aparezcan en la app.
+List<Artist> buildMockArtists() {
+  final list = _mockArtists();
+  final paid = Subscription(
+    status: 'active',
+    trialEnd: subscriptionLaunch,
+    paidUntil: DateTime(2099),
+    simulated: true,
+  );
+  for (final a in list) {
+    a.subscription = paid;
+  }
+  // Sofía (cuenta de prueba del artista) está en su mes gratis.
+  final sofia = list.firstWhere((a) => a.id == 'a1')
+    ..subscription = null
+    ..createdAt = DateTime.now();
+  sofia.reviewList.addAll([
+    Review(
+      id: 'rev-ejemplo-1',
+      artistId: 'a1',
+      clientUid: '',
+      clientName: 'Café Borinquen',
+      rating: 5,
+      text: 'Llegó temprano, sonó espectacular y a los clientes les encantó.',
+      createdAt: DateTime.now().subtract(const Duration(days: 12)),
+    ),
+    Review(
+      id: 'rev-ejemplo-2',
+      artistId: 'a1',
+      clientUid: '',
+      clientName: 'Boda Rodríguez-Colón',
+      rating: 4,
+      text: 'Muy bonita la ceremonia. El sonido tardó un poco en montarse.',
+      createdAt: DateTime.now().subtract(const Duration(days: 30)),
+    ),
+  ]);
+  return list;
+}
+
+List<Artist> _mockArtists() => [
   // Artista real: perfil de prueba armado con su Instagram público.
   // Mostrarlo fuera de una demo privada requiere su permiso.
   Artist(
@@ -33,7 +73,12 @@ List<Artist> buildMockArtists() => [
         'Precios, distancia y valoración son de ejemplo.',
     eventTypes: {EventType.restaurante, EventType.cumpleanos, EventType.boda},
     packages: [
-      PricePackage(name: 'Set acústico (ejemplo)', price: 200, hours: 2),
+      PricePackage(
+        name: 'Set acústico (ejemplo)',
+        price: 200,
+        hours: 2,
+        kind: PackageKind.restaurante,
+      ),
     ],
     links: [
       MediaLink(
@@ -77,6 +122,7 @@ List<Artist> buildMockArtists() => [
         price: 180,
         hours: 2,
         description: 'Voz y guitarra.',
+        kind: PackageKind.restaurante,
       ),
       PricePackage(
         name: 'Ceremonia de boda',
@@ -206,6 +252,12 @@ List<Artist> buildMockArtists() => [
     verified: true,
     eventTypes: {EventType.restaurante, EventType.actividad, EventType.boda},
     packages: [
+      PricePackage(
+        name: 'Cena en restaurante',
+        price: 380,
+        hours: 2,
+        kind: PackageKind.restaurante,
+      ),
       PricePackage(name: 'Cóctel', price: 450, hours: 2),
       PricePackage(name: 'Cena + cóctel', price: 700, hours: 3.5),
     ],
@@ -239,7 +291,12 @@ List<Artist> buildMockArtists() => [
     eventTypes: {EventType.cumpleanos, EventType.restaurante},
     packages: [
       PricePackage(name: 'Cumpleaños infantil', price: 150, hours: 1),
-      PricePackage(name: 'Show acústico', price: 220, hours: 2),
+      PricePackage(
+        name: 'Show acústico',
+        price: 220,
+        hours: 2,
+        kind: PackageKind.restaurante,
+      ),
     ],
     links: [
       MediaLink(

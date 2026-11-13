@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../app_state.dart';
 import '../models.dart';
 import '../widgets/common.dart';
+import '../widgets/subscription_card.dart';
 import 'availability_screen.dart';
 import 'inbox_screen.dart';
 
@@ -32,9 +33,12 @@ class ArtistPanelScreen extends StatelessWidget {
             subtitle: Text(
               me.packages.isEmpty
                   ? 'Añade al menos un precio para aparecer en Explorar.'
-                  : 'Tu página está publicada.',
+                  : me.listed
+                  ? 'Tu página está publicada.'
+                  : 'Tu página no aparece: activa tu suscripción.',
             ),
           ),
+          const SubscriptionCard(),
           Card(
             child: ListTile(
               leading: const Icon(Icons.calendar_month),
@@ -65,8 +69,11 @@ class ArtistPanelScreen extends StatelessWidget {
           for (final p in me.packages)
             Card(
               child: ListTile(
+                leading: Icon(p.kind.icon),
                 title: Text(p.name),
                 subtitle: Text(
+                  '${p.kind.label} · '
+                  '${p.takesDeposit ? 'depósito ${me.depositPercent}%' : 'sin depósito'} · '
                   '${p.hours} h${p.description.isEmpty ? '' : ' · ${p.description}'}',
                 ),
                 trailing: Text(
@@ -76,6 +83,27 @@ class ArtistPanelScreen extends StatelessWidget {
                 onTap: () => _editPackage(context, state, me, existing: p),
               ),
             ),
+          _header(context, 'Reseñas de mis clientes'),
+          if (me.reviews == 0)
+            const Text(
+              'Aún no tienes reseñas. Tus clientes pueden dejarte estrellas '
+              'después de cada evento confirmado.',
+            )
+          else ...[
+            Row(
+              children: [
+                const Icon(Icons.star_rounded, color: starColor),
+                const SizedBox(width: 4),
+                Text(
+                  '${me.rating.toStringAsFixed(1)} · ${me.reviews} '
+                  '${me.reviews == 1 ? 'reseña' : 'reseñas'}',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            for (final r in me.reviewList.take(20)) ReviewTile(review: r),
+          ],
           _header(
             context,
             'Mis videos y redes',
@@ -134,100 +162,129 @@ class ArtistPanelScreen extends StatelessWidget {
       text: existing?.hours.toString() ?? '2',
     );
     final desc = TextEditingController(text: existing?.description);
+    var kind = existing?.kind ?? PackageKind.actividad;
     final formKey = GlobalKey<FormState>();
 
     final saved = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.fromLTRB(
-          16,
-          16,
-          16,
-          MediaQuery.of(ctx).viewInsets.bottom + 16,
-        ),
-        child: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                existing == null ? 'Nuevo paquete' : 'Editar paquete',
-                style: Theme.of(ctx).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: name,
-                decoration: const InputDecoration(
-                  labelText: 'Nombre',
-                  border: OutlineInputBorder(),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => Padding(
+          padding: EdgeInsets.fromLTRB(
+            16,
+            16,
+            16,
+            MediaQuery.of(ctx).viewInsets.bottom + 16,
+          ),
+          child: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  existing == null ? 'Nuevo paquete' : 'Editar paquete',
+                  style: Theme.of(ctx).textTheme.titleLarge,
                 ),
-                validator: (v) => (v ?? '').trim().isEmpty ? 'Requerido' : null,
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: price,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'Precio',
-                        prefixText: r'$ ',
-                        border: OutlineInputBorder(),
+                const SizedBox(height: 12),
+                SegmentedButton<PackageKind>(
+                  segments: [
+                    for (final k in PackageKind.values)
+                      ButtonSegment(
+                        value: k,
+                        icon: Icon(k.icon),
+                        label: Text(
+                          k == PackageKind.actividad ? 'Actividad' : k.label,
+                        ),
                       ),
-                      validator: (v) =>
-                          double.tryParse(v ?? '') == null ? 'Número' : null,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextFormField(
-                      controller: hours,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: const InputDecoration(
-                        labelText: 'Horas',
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (v) =>
-                          double.tryParse(v ?? '') == null ? 'Número' : null,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: desc,
-                decoration: const InputDecoration(
-                  labelText: 'Qué incluye (opcional)',
-                  border: OutlineInputBorder(),
+                  ],
+                  selected: {kind},
+                  onSelectionChanged: (v) => setSheet(() => kind = v.first),
                 ),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  if (existing != null)
-                    TextButton(
+                const SizedBox(height: 6),
+                Text(
+                  kind == PackageKind.actividad
+                      ? 'Bodas, cumpleaños, actividades. El cliente deja un '
+                            'depósito del ${me.depositPercent}% (lo cambias en '
+                            'Mi página).'
+                      : kind.description,
+                  style: Theme.of(ctx).textTheme.bodySmall,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: name,
+                  decoration: const InputDecoration(
+                    labelText: 'Nombre',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (v) =>
+                      (v ?? '').trim().isEmpty ? 'Requerido' : null,
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: price,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'Precio',
+                          prefixText: r'$ ',
+                          border: OutlineInputBorder(),
+                        ),
+                        validator: (v) =>
+                            double.tryParse(v ?? '') == null ? 'Número' : null,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: TextFormField(
+                        controller: hours,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: const InputDecoration(
+                          labelText: 'Horas',
+                          border: OutlineInputBorder(),
+                        ),
+                        validator: (v) =>
+                            double.tryParse(v ?? '') == null ? 'Número' : null,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: desc,
+                  decoration: const InputDecoration(
+                    labelText: 'Qué incluye (opcional)',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    if (existing != null)
+                      TextButton(
+                        onPressed: () {
+                          state.removePackage(me, existing);
+                          Navigator.pop(ctx, false);
+                        },
+                        child: const Text('Eliminar'),
+                      ),
+                    const Spacer(),
+                    FilledButton(
                       onPressed: () {
-                        state.removePackage(me, existing);
-                        Navigator.pop(ctx, false);
+                        if (formKey.currentState!.validate()) {
+                          Navigator.pop(ctx, true);
+                        }
                       },
-                      child: const Text('Eliminar'),
+                      child: const Text('Guardar'),
                     ),
-                  const Spacer(),
-                  FilledButton(
-                    onPressed: () {
-                      if (formKey.currentState!.validate()) {
-                        Navigator.pop(ctx, true);
-                      }
-                    },
-                    child: const Text('Guardar'),
-                  ),
-                ],
-              ),
-            ],
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -240,6 +297,7 @@ class ArtistPanelScreen extends StatelessWidget {
           price: double.parse(price.text),
           hours: double.parse(hours.text),
           description: desc.text.trim(),
+          kind: kind,
         ),
         replacing: existing,
       );
@@ -340,10 +398,13 @@ class _RequestCard extends StatelessWidget {
             if (b.notes.isNotEmpty) Text('Notas: ${b.notes}'),
             const SizedBox(height: 4),
             Text(
-              '${b.payDeposit ? 'Depósito' : 'Pago completo'} '
-              '(${b.paidWith}): '
-              '${money(b.amountCharged)} de ${money(b.total)} · '
-              '${b.payment.label}',
+              b.noDeposit
+                  ? 'Restaurante, sin depósito: ${money(b.total)} a pagar '
+                        'directo al artista'
+                  : '${b.payDeposit ? 'Depósito' : 'Pago completo'} '
+                        '(${b.paidWith}): '
+                        '${money(b.amountCharged)} de ${money(b.total)} · '
+                        '${b.payment.label}',
               style: const TextStyle(fontWeight: FontWeight.w600),
             ),
             if (b.status == BookingStatus.pendiente) ...[

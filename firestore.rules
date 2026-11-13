@@ -13,9 +13,30 @@ service cloud.firestore {
     }
 
     // Página pública del artista: todos la ven, solo el artista la cambia.
+    // createdAt (desde cuándo cuenta su mes gratis) se pone al crear la
+    // página y no se puede cambiar después.
     match /artists/{uid} {
       allow read: if true;
-      allow write: if signedIn() && me() == uid;
+      allow create: if signedIn() && me() == uid &&
+        (!('createdAt' in request.resource.data) ||
+         (request.resource.data.createdAt is int &&
+          request.resource.data.createdAt > request.time.toMillis() - 600000 &&
+          request.resource.data.createdAt < request.time.toMillis() + 600000));
+      allow update: if signedIn() && me() == uid &&
+        request.resource.data.get('createdAt', 0) == resource.data.get('createdAt', 0);
+      allow delete: if signedIn() && me() == uid;
+    }
+
+    // Suscripción de $10 al mes de cada artista: todos la leen (para saber
+    // quién aparece en la app); solo el servidor (/api/subscribe) la escribe.
+    match /subscriptions/{uid} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Cliente de Stripe de cada artista: solo el servidor.
+    match /billing/{uid} {
+      allow read, write: if false;
     }
 
     // Horas ocupadas (sin datos del cliente), para mostrar horarios libres.
@@ -46,6 +67,24 @@ service cloud.firestore {
     // Datos internos de cada cobro (Stripe / ATH Móvil): solo el servidor.
     match /payments/{id} {
       allow read, write: if false;
+    }
+
+    // Reseñas: todos las leen. Solo el cliente de una reserva confirmada
+    // cuyo evento ya pasó puede dejarla (una por reserva) y cambiarla.
+    function reviewOk(bookingId) {
+      let b = get(/databases/$(database)/documents/bookings/$(bookingId)).data;
+      let r = request.resource.data;
+      return b.clientUid == me() && b.status == 'confirmada' &&
+        b.start + b.hours * 3600000 < request.time.toMillis() &&
+        r.clientUid == me() && r.artistId == b.artistId &&
+        r.rating is int && r.rating >= 1 && r.rating <= 5 &&
+        r.text is string && r.text.size() <= 600 &&
+        r.clientName is string && r.clientName.size() <= 120;
+    }
+    match /reviews/{bookingId} {
+      allow read: if true;
+      allow create, update: if signedIn() && reviewOk(bookingId);
+      allow delete: if signedIn() && resource.data.clientUid == me();
     }
 
     // Chats: solo las dos personas de la conversación.

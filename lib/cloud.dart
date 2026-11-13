@@ -22,6 +22,9 @@ import 'models.dart';
 /// - bookings/{id}: reservas; las leen solo el cliente y el artista.
 /// - conversations/{artistId__clientUid}: chat con sus mensajes.
 /// - notifications/{id}: avisos para cada persona.
+/// - subscriptions/{uid}: suscripción del artista (solo la escribe el
+///   servidor); todos la leen para saber qué artistas aparecen.
+/// - reviews/{bookingId}: reseñas y estrellas que dejan los clientes.
 class Cloud {
   Cloud._(this.state);
 
@@ -76,12 +79,16 @@ class Cloud {
       if (artist != null) {
         artist
           ..id = id
-          ..email = email;
+          ..email = email
+          ..createdAt = DateTime.now();
         await _col('artists').doc(id).set(artistToMap(artist));
       }
       await _col('users').doc(id).set(accountToMap(a));
       state.signIn(a);
       _listenPrivate();
+      if (artist != null) {
+        unawaited(refreshSubscription().catchError((_) {}));
+      }
       return null;
     } on FirebaseAuthException catch (e) {
       return authError(e.code);
@@ -149,6 +156,7 @@ class Cloud {
     }
     state.signIn(accountFromMap(data, artist));
     _listenPrivate();
+    if (artist != null) unawaited(refreshSubscription().catchError((_) {}));
   }
 
   // ---------- Escuchar cambios ----------
@@ -170,6 +178,22 @@ class Cloud {
           applyArtistMap(existing, doc.data());
         }
       }
+      _applySubscriptions();
+      _applyReviews();
+      state.cloudChanged();
+    }, onError: _ignore);
+    _col('subscriptions').snapshots().listen((snap) {
+      for (final doc in snap.docs) {
+        _subscriptions[doc.id] = subscriptionFromMap(doc.data());
+      }
+      _applySubscriptions();
+      state.cloudChanged();
+    }, onError: _ignore);
+    _col('reviews').snapshots().listen((snap) {
+      _reviews
+        ..clear()
+        ..addAll([for (final d in snap.docs) reviewFromMap(d.id, d.data())]);
+      _applyReviews();
       state.cloudChanged();
     }, onError: _ignore);
     _col('busy').snapshots().listen((snap) {
@@ -183,6 +207,24 @@ class Cloud {
       }
       state.cloudChanged();
     }, onError: _ignore);
+  }
+
+  final _subscriptions = <String, Subscription>{};
+  final _reviews = <Review>[];
+
+  void _applySubscriptions() {
+    for (final a in state.artists) {
+      a.subscription = _subscriptions[a.id] ?? a.subscription;
+    }
+  }
+
+  void _applyReviews() {
+    for (final a in state.artists) {
+      a.reviewList
+        ..clear()
+        ..addAll(_reviews.where((r) => r.artistId == a.id));
+      a.reviewList.sort((x, y) => y.createdAt.compareTo(x.createdAt));
+    }
   }
 
   void _listenPrivate() {
@@ -265,6 +307,7 @@ class Cloud {
         total: (d['total'] as num).toDouble(),
         amountCharged: (d['amountCharged'] as num).toDouble(),
         payDeposit: d['payDeposit'] ?? true,
+        noDeposit: d['noDeposit'] == true,
         cardLast4: d['cardLast4'] ?? '',
         status: BookingStatus.values.byName(d['status']),
         payment: PaymentStatus.values.byName(d['payment']),
@@ -365,6 +408,7 @@ class Cloud {
       'total': b.total,
       'amountCharged': b.amountCharged,
       'payDeposit': b.payDeposit,
+      'noDeposit': b.noDeposit,
       'cardLast4': b.cardLast4,
       'status': b.status.name,
       'payment': b.payment.name,
@@ -501,6 +545,63 @@ class Cloud {
     return d;
   }
 
+  // ---------- Reseñas ----------
+
+  /// Guarda la reseña (las reglas de Firestore comprueban que la reserva es
+  /// del cliente, que el artista la confirmó y que el evento ya pasó).
+  Future<void> saveReview(Review r) => _col('reviews').doc(r.id).set({
+    'artistId': r.artistId,
+    'clientUid': r.clientUid,
+    'clientName': r.clientName,
+    'rating': r.rating,
+    'text': r.text,
+    'createdAt': r.createdAt.millisecondsSinceEpoch,
+  });
+
+  // ---------- Suscripción del artista (función de Vercel en /api/subscribe) --
+
+  /// Llama al servidor de suscripciones. Lanza [PayError] si algo sale mal.
+  Future<Map<String, dynamic>> subscription(String action) async {
+    final token = await _auth.currentUser?.getIdToken();
+    if (token == null) throw const PayError('Entra a tu cuenta otra vez');
+    final http.Response r;
+    try {
+      r = await http
+          .post(
+            apiUri('/api/subscribe'),
+            headers: {
+              'Authorization': 'Bearer $token',
+              'Content-Type': 'application/json',
+            },
+            body: jsonEncode({'action': action}),
+          )
+          .timeout(const Duration(seconds: 30));
+    } catch (_) {
+      throw const PayError('No hay conexión con el servidor');
+    }
+    Map<String, dynamic> d;
+    try {
+      d = (jsonDecode(r.body) as Map).cast<String, dynamic>();
+    } catch (_) {
+      d = {};
+    }
+    if (r.statusCode != 200) {
+      throw PayError(d['error'] ?? 'Error del servidor (${r.statusCode})');
+    }
+    final sub = d['subscription'];
+    final id = uid;
+    if (sub is Map && id != null) {
+      _subscriptions[id] = subscriptionFromMap(sub.cast<String, dynamic>());
+      _applySubscriptions();
+      state.cloudChanged();
+    }
+    return d;
+  }
+
+  /// Pregunta al servidor cómo está la suscripción (y la crea con el mes
+  /// gratis si es nueva).
+  Future<void> refreshSubscription() => subscription('status');
+
   void markRead(AppNotification n) {
     if (n.id != null) _col('notifications').doc(n.id).update({'read': true});
   }
@@ -626,6 +727,7 @@ Map<String, dynamic> artistToMap(Artist a) {
     'depositPercent': a.depositPercent,
     'conditions': a.conditions,
     'email': a.email.toLowerCase(),
+    if (a.createdAt != null) 'createdAt': a.createdAt!.millisecondsSinceEpoch,
     'bufferMinutes': a.bufferMinutes,
     'eventTypes': [for (final e in a.eventTypes) e.name],
     'packages': [
@@ -635,6 +737,7 @@ Map<String, dynamic> artistToMap(Artist a) {
           'price': p.price,
           'hours': p.hours,
           'description': p.description,
+          'kind': p.kind.name,
         },
     ],
     'links': [
@@ -690,6 +793,7 @@ void applyArtistMap(Artist a, Map<String, dynamic> d) {
     ..conditions = d['conditions'] ?? defaultConditions
     ..email = d['email'] ?? a.email
     ..bufferMinutes = (d['bufferMinutes'] as num?)?.toInt() ?? 60
+    ..createdAt = d['createdAt'] is num ? _date(d['createdAt']) : a.createdAt
     ..eventTypes = {
       for (final e in strings(d['eventTypes'])) EventType.values.byName(e),
     }
@@ -704,6 +808,9 @@ void applyArtistMap(Artist a, Map<String, dynamic> d) {
           price: (p['price'] as num).toDouble(),
           hours: (p['hours'] as num).toDouble(),
           description: p['description'] ?? '',
+          kind: p['kind'] == PackageKind.restaurante.name
+              ? PackageKind.restaurante
+              : PackageKind.actividad,
         ),
     ]);
   a.links
@@ -735,3 +842,21 @@ void applyArtistMap(Artist a, Map<String, dynamic> d) {
     ..clear()
     ..addAll([for (final g in (d['gallery'] as List? ?? [])) ?bytes(g)]);
 }
+
+Subscription subscriptionFromMap(Map<String, dynamic> d) => Subscription(
+  status: d['status'] ?? 'sinTarjeta',
+  trialEnd: _date(d['trialEnd']),
+  paidUntil: d['paidUntil'] is num ? _date(d['paidUntil']) : null,
+  cancelAtPeriodEnd: d['cancelAtPeriodEnd'] == true,
+  simulated: d['simulated'] == true,
+);
+
+Review reviewFromMap(String id, Map<String, dynamic> d) => Review(
+  id: id,
+  artistId: d['artistId'] ?? '',
+  clientUid: d['clientUid'] ?? '',
+  clientName: d['clientName'] ?? '',
+  rating: ((d['rating'] as num?)?.toInt() ?? 5).clamp(1, 5),
+  text: d['text'] ?? '',
+  createdAt: _date(d['createdAt']),
+);

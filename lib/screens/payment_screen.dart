@@ -90,7 +90,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
       switch (m) {
         PaymentMethod.tarjeta => _config?.card == true,
         PaymentMethod.ath => _config?.ath == true,
-        PaymentMethod.prueba => false,
+        PaymentMethod.prueba || PaymentMethod.ninguno => false,
       };
 
   String get _digits => _card.text.replaceAll(RegExp(r'\D'), '');
