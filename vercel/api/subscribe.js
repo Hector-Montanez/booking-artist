@@ -31,7 +31,16 @@ const LAUNCH = Date.UTC(2026, 10, 7);
 function firebase() {
   if (admin.apps.length) return admin.app();
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
-  return admin.initializeApp(raw ? { credential: admin.credential.cert(JSON.parse(raw)) } : {});
+  // Sin la cuenta de servicio no se puede comprobar quién llama: se avisa
+  // claro en vez de decir "Entra a tu cuenta otra vez".
+  if (!raw) throw new Fail(503, 'Falta FIREBASE_SERVICE_ACCOUNT en Vercel (Settings → Environment Variables).');
+  let creds;
+  try {
+    creds = JSON.parse(raw);
+  } catch (_) {
+    throw new Fail(503, 'FIREBASE_SERVICE_ACCOUNT en Vercel no es un JSON válido: pega el archivo completo, desde { hasta }.');
+  }
+  return admin.initializeApp({ credential: admin.credential.cert(creds) });
 }
 
 class Fail extends Error {
