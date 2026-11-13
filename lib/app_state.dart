@@ -285,6 +285,25 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Borra la cuenta y sus datos (lo exige Apple para publicar en el App
+  /// Store). Devuelve un mensaje de error, o null si salió bien.
+  Future<String?> deleteAccount(String password) async {
+    final a = account;
+    if (a == null) return null;
+    if (cloud != null) {
+      final error = await cloud!.deleteAccount(password);
+      if (error != null) return error;
+    } else {
+      if (findAccount(a.email, password) == null) {
+        return 'Contraseña incorrecta';
+      }
+      accounts.remove(a);
+    }
+    if (a.artist != null) artists.remove(a.artist);
+    signOut();
+    return null;
+  }
+
   void signOut() {
     cloud?.signOut();
     if (cloud != null) {

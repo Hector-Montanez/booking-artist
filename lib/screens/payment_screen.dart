@@ -175,7 +175,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
               else
                 Text(
                   'Al tocar Pagar se abre la página segura de Stripe para '
-                  'escribir los datos de tu tarjeta. Booking Artist nunca ve '
+                  'escribir los datos de tu tarjeta. Tarima nunca ve '
                   'ni guarda el número completo.',
                   style: theme.textTheme.bodyMedium,
                 ),

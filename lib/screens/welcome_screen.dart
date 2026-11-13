@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../app_state.dart';
 import '../widgets/stage_slideshow.dart';
+import '../theme.dart';
 import 'signup_screens.dart';
 
 class WelcomeScreen extends StatelessWidget {
@@ -22,94 +23,121 @@ class _WelcomeContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final neon = isFuturista(context);
     return SafeArea(
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 480),
-          child: ListView(
-            padding: const EdgeInsets.all(24),
-            children: [
-              const SizedBox(height: 48),
-              Icon(
-                Icons.queue_music,
-                size: 72,
-                color: theme.colorScheme.primary,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Booking Artist',
-                textAlign: TextAlign.center,
-                style: theme.textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                  shadows: const [Shadow(blurRadius: 12)],
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Contrata músicos, agrupaciones, DJs y payasos en Caguas, '
-                'con los precios que fija cada artista.',
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyLarge?.copyWith(
-                  color: Colors.white,
-                  shadows: const [Shadow(blurRadius: 8)],
-                ),
-              ),
-              const SizedBox(height: 120),
-              _RoleCard(
-                icon: Icons.storefront,
-                title: 'Quiero contratar',
-                subtitle: 'Para restaurantes, bodas, cumpleaños y actividades.',
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const ClientSignupScreen()),
-                ),
-              ),
-              const SizedBox(height: 12),
-              _RoleCard(
-                icon: Icons.mic_external_on,
-                title: 'Soy artista',
-                subtitle: 'Crea tu página, sube tus fotos y fija tus precios.',
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const ArtistSignupScreen()),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextButton(
-                onPressed: () => Navigator.of(
-                  context,
-                ).push(MaterialPageRoute(builder: (_) => const LoginScreen())),
-                child: const Text('Ya tengo cuenta: iniciar sesión'),
-              ),
-              // Las cuentas de prueba solo existen en modo demo.
-              if (!AppScope.of(context).online) ...[
-                const SizedBox(height: 24),
-                Text(
-                  'Cuentas de prueba',
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.titleSmall,
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  alignment: WrapAlignment.center,
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    OutlinedButton.icon(
-                      icon: const Icon(Icons.storefront),
-                      label: const Text('Restaurante El Patio'),
-                      onPressed: () => _demo(context, AppState.demoClientEmail),
+      child: Stack(
+        children: [
+          Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 480),
+              child: ListView(
+                padding: const EdgeInsets.all(24),
+                children: [
+                  const SizedBox(height: 48),
+                  Icon(
+                    Icons.queue_music,
+                    size: 72,
+                    color: theme.colorScheme.primary,
+                    shadows: neon
+                        ? const [Shadow(color: NeonColors.cyan, blurRadius: 24)]
+                        : null,
+                  ),
+                  const SizedBox(height: 16),
+                  if (neon)
+                    NeonText(
+                      'TARIMA',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.displayMedium?.copyWith(
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 10,
+                      ),
+                    )
+                  else
+                    Text(
+                      'Tarima',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        shadows: const [Shadow(blurRadius: 12)],
+                      ),
                     ),
-                    OutlinedButton.icon(
-                      icon: const Icon(Icons.mic_external_on),
-                      label: const Text('Artista Sofía Rivera'),
-                      onPressed: () => _demo(context, AppState.demoArtistEmail),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Contrata músicos, agrupaciones, DJs y payasos en Puerto Rico, '
+                    'con los precios que fija cada artista.',
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: Colors.white,
+                      shadows: const [Shadow(blurRadius: 8)],
+                    ),
+                  ),
+                  const SizedBox(height: 120),
+                  _RoleCard(
+                    icon: Icons.storefront,
+                    title: 'Quiero contratar',
+                    subtitle:
+                        'Para restaurantes, bodas, cumpleaños y actividades.',
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const ClientSignupScreen(),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _RoleCard(
+                    icon: Icons.mic_external_on,
+                    title: 'Soy artista',
+                    subtitle:
+                        'Crea tu página, sube tus fotos y fija tus precios.',
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const ArtistSignupScreen(),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const LoginScreen()),
+                    ),
+                    child: const Text('Ya tengo cuenta: iniciar sesión'),
+                  ),
+                  // Las cuentas de prueba solo existen en modo demo.
+                  if (!AppScope.of(context).online) ...[
+                    const SizedBox(height: 24),
+                    Text(
+                      'Cuentas de prueba',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        OutlinedButton.icon(
+                          icon: const Icon(Icons.storefront),
+                          label: const Text('Restaurante El Patio'),
+                          onPressed: () =>
+                              _demo(context, AppState.demoClientEmail),
+                        ),
+                        OutlinedButton.icon(
+                          icon: const Icon(Icons.mic_external_on),
+                          label: const Text('Artista Sofía Rivera'),
+                          onPressed: () =>
+                              _demo(context, AppState.demoArtistEmail),
+                        ),
+                      ],
                     ),
                   ],
-                ),
-              ],
-            ],
+                ],
+              ),
+            ),
           ),
-        ),
+          const Positioned(top: 4, right: 4, child: StyleToggleButton()),
+        ],
       ),
     );
   }
@@ -136,8 +164,15 @@ class _RoleCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final neon = isFuturista(context);
     return Card(
-      color: const Color(0xCC1A1424),
+      color: neon ? const Color(0xCC05060F) : const Color(0xCC1A1424),
+      shape: neon
+          ? RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(18),
+              side: BorderSide(color: NeonColors.cyan.withValues(alpha: 0.5)),
+            )
+          : null,
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,

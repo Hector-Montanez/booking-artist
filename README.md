@@ -1,14 +1,14 @@
 # Booking Artist (prototipo)
 
 App móvil (iOS y Android) hecha con Flutter para reservar músicos, agrupaciones, DJs y payasos.
-Ciudad de prueba: Caguas, Puerto Rico. Usa datos de ejemplo: seis artistas ficticios y un perfil de prueba de Kimy-K Acústico (artista real, con su Instagram público; precios de ejemplo).
+Para todo Puerto Rico (la primera prueba fue en Caguas). Usa datos de ejemplo: seis artistas ficticios y un perfil de prueba de Kimy-K Acústico (artista real, con su Instagram público; precios de ejemplo).
 
 ## Qué incluye
 - **Crear cuenta**: al abrir la app se escoge "Quiero contratar" o "Soy artista".
   - Cliente: nombre, teléfono, correo, contraseña y si es **cliente privado**, **restaurante/negocio** o **agrupación/banda** (con nombre y dirección del local, que se llenan solos al reservar).
   - Artista: tipo (**Solista**, **Músico independiente**, **Agrupación**, **DJ** o **Payaso**), instrumentos que toca, nombre artístico, géneros y datos de contacto. Las agrupaciones pueden buscar músicos independientes por instrumento (bongosero, bajista, cuatrista…).
 - **Mi página (artista)**: subir foto de perfil, portada y galería de fotos; frase corta, biografía, géneros, eventos que acepta y color de la página. El botón "Ver" muestra la página como la ven los clientes. Un artista aparece en Explorar cuando publica al menos un precio.
-- **Explorar**: artistas cerca de Caguas, búsqueda por nombre o género, filtros por tipo de artista y de evento, orden por distancia, precio o valoración.
+- **Explorar**: artistas cerca de ti, búsqueda por nombre o género, filtros por tipo de artista y de evento, orden por distancia, precio o valoración.
 - **Perfil del artista**: biografía, géneros, precios fijados por el artista, videos y redes (enlaces públicos que el artista pega).
 - **Reservar y pagar**: paquete, tipo de evento, fecha, hora, lugar y notas; el cliente lee y acepta las condiciones del artista (depósito y cancelación) y paga el depósito o el total con tarjeta (Stripe) o ATH Móvil. Con tarjeta el dinero queda retenido y se cobra solo si el artista acepta; si rechaza, se libera. ATH Móvil cobra al momento y se reembolsa si el artista rechaza o el cliente cancela. Tarifa de la plataforma: 10 %. Tarjeta de prueba: 4242 4242 4242 4242.
 - **Mis reservas**: estado de cada solicitud (pendiente, confirmada, cancelada).

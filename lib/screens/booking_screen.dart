@@ -164,7 +164,7 @@ class _BookingScreenState extends State<BookingScreen> {
               controller: _venue,
               decoration: const InputDecoration(
                 labelText: 'Lugar del evento',
-                hintText: 'Ej. Restaurante El Patio, Caguas',
+                hintText: 'Ej. Restaurante El Patio, San Juan',
                 prefixIcon: Icon(Icons.place),
                 border: OutlineInputBorder(),
               ),

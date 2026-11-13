@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../app_state.dart';
 import '../models.dart';
+import '../theme.dart';
 import '../widgets/common.dart';
 import 'artist_detail_screen.dart';
 
@@ -57,6 +58,17 @@ class _ExploreScreenState extends State<ExploreScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (isFuturista(context)) ...[
+                    NeonText(
+                      'TARIMA',
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        fontFamily: 'Orbitron',
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 3,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                  ],
                   Row(
                     children: [
                       Icon(
@@ -64,17 +76,26 @@ class _ExploreScreenState extends State<ExploreScreen> {
                         color: Theme.of(context).colorScheme.primary,
                       ),
                       const SizedBox(width: 4),
-                      const Text(
-                        'Caguas, Puerto Rico',
-                        style: TextStyle(fontWeight: FontWeight.w600),
+                      const Flexible(
+                        child: Text(
+                          'Puerto Rico',
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    '¿A quién quieres contratar?',
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
+                  if (isFuturista(context))
+                    NeonText(
+                      '¿A quién quieres contratar?',
+                      style: Theme.of(context).textTheme.headlineSmall,
+                    )
+                  else
+                    Text(
+                      '¿A quién quieres contratar?',
+                      style: Theme.of(context).textTheme.headlineSmall,
+                    ),
                   const SizedBox(height: 12),
                   SearchBar(
                     hintText: 'Busca por nombre, género o instrumento',
@@ -204,6 +225,7 @@ class ArtistCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (isFuturista(context)) return _NeonArtistCard(artist: artist);
     final scheme = Theme.of(context).colorScheme;
     return Card(
       clipBehavior: Clip.antiAlias,
@@ -290,4 +312,220 @@ class ArtistCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Tarjeta del estilo futurista: la foto del artista a todo lo ancho, con
+/// el nombre y el precio encima en letras neón.
+class _NeonArtistCard extends StatelessWidget {
+  const _NeonArtistCard({required this.artist});
+
+  final Artist artist;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final detail =
+        (artist.category == ArtistCategory.musicoIndependiente
+                ? artist.instruments
+                : artist.genres)
+            .join(' · ');
+    return Container(
+      height: 210,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: NeonColors.cyan.withValues(alpha: 0.35)),
+        boxShadow: [
+          BoxShadow(
+            color: artist.color.withValues(alpha: 0.35),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Material(
+        color: NeonColors.card,
+        child: InkWell(
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => ArtistDetailScreen(artist: artist),
+            ),
+          ),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Hero(
+                tag: 'avatar-${artist.id}',
+                child: ArtistCoverImage(artist: artist),
+              ),
+              // Capa oscura abajo para que el texto se lea.
+              const DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Color(0x00000000),
+                      Color(0x66050612),
+                      Color(0xF2050612),
+                    ],
+                    stops: [0, 0.45, 1],
+                  ),
+                ),
+              ),
+              // Línea neón arriba.
+              const Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                height: 3,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(gradient: NeonColors.gradient),
+                ),
+              ),
+              Positioned(
+                top: 12,
+                left: 12,
+                child: _Pill(
+                  icon: artist.category.icon,
+                  text: artist.category.label.toUpperCase(),
+                ),
+              ),
+              Positioned(
+                top: 12,
+                right: 12,
+                child: _Pill(
+                  icon: Icons.place,
+                  text: '${artist.distanceKm} km',
+                ),
+              ),
+              Positioned(
+                left: 16,
+                right: 16,
+                bottom: 14,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  artist.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.titleLarge?.copyWith(
+                                    color: Colors.white,
+                                    fontSize: 20,
+                                  ),
+                                ),
+                              ),
+                              if (artist.verified) ...[
+                                const SizedBox(width: 6),
+                                const Icon(
+                                  Icons.verified,
+                                  size: 18,
+                                  color: NeonColors.cyan,
+                                ),
+                              ],
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            detail,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Color(0xFFB9C0E6)),
+                          ),
+                          const SizedBox(height: 4),
+                          RatingLabel(artist: artist),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(14),
+                        color: const Color(0xCC05060F),
+                        border: Border.all(color: NeonColors.cyan),
+                        boxShadow: [
+                          BoxShadow(
+                            color: NeonColors.cyan.withValues(alpha: 0.45),
+                            blurRadius: 12,
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          const Text(
+                            'DESDE',
+                            style: TextStyle(
+                              fontSize: 10,
+                              letterSpacing: 1.5,
+                              color: NeonColors.muted,
+                            ),
+                          ),
+                          Text(
+                            money(artist.minPrice),
+                            style: const TextStyle(
+                              fontFamily: 'Orbitron',
+                              fontWeight: FontWeight.w800,
+                              fontSize: 18,
+                              color: NeonColors.cyan,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _Pill extends StatelessWidget {
+  const _Pill({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+    decoration: BoxDecoration(
+      color: const Color(0xB305060F),
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(color: Colors.white24),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 14, color: NeonColors.cyan),
+        const SizedBox(width: 5),
+        Text(
+          text,
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1,
+            color: Colors.white,
+          ),
+        ),
+      ],
+    ),
+  );
 }

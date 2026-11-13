@@ -1,11 +1,11 @@
 {
-    "name": "booking_artist",
-    "short_name": "booking_artist",
+    "name": "Tarima",
+    "short_name": "Tarima",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "Contrata músicos, DJs, agrupaciones y payasos con los precios de cada artista.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../app_state.dart';
 import '../availability.dart';
 import '../models.dart';
+import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/embed_player.dart';
 import 'booking_screen.dart';
@@ -23,7 +24,17 @@ class ArtistDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     AppScope.of(context); // se reconstruye si el artista cambia sus precios
+    // La página entera usa el color que escogió el artista.
+    final theme = artistPageTheme(Theme.of(context), artist.color);
+    return Theme(
+      data: theme,
+      child: Builder(builder: _page),
+    );
+  }
+
+  Widget _page(BuildContext context) {
     final theme = Theme.of(context);
+    final accent = theme.colorScheme.primary;
     // Videos y publicaciones que se pueden ver con el reproductor oficial.
     final videos = artist.links
         .where((l) => embedUrl(l.url) != null || l.kind == LinkKind.youtube)
@@ -33,39 +44,90 @@ class ArtistDetailScreen extends StatelessWidget {
     return Scaffold(
       body: CustomScrollView(
         slivers: [
-          SliverAppBar.large(
-            title: Text(artist.name),
-            expandedHeight: 220,
-            flexibleSpace: FlexibleSpaceBar(
-              background: Container(
-                decoration: BoxDecoration(
-                  image: artist.cover == null
-                      ? null
-                      : DecorationImage(
-                          image: MemoryImage(artist.cover!),
-                          fit: BoxFit.cover,
-                          colorFilter: ColorFilter.mode(
-                            Colors.black.withValues(alpha: 0.25),
-                            BlendMode.darken,
-                          ),
-                        ),
-                  gradient: LinearGradient(
-                    colors: [
-                      artist.color.withValues(alpha: 0.85),
-                      theme.colorScheme.surface,
-                    ],
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
+          if (isFuturista(context))
+            SliverAppBar(
+              pinned: true,
+              expandedHeight: 340,
+              backgroundColor: NeonColors.bg,
+              flexibleSpace: FlexibleSpaceBar(
+                titlePadding: const EdgeInsetsDirectional.only(
+                  start: 56,
+                  end: 16,
+                  bottom: 14,
+                ),
+                title: Text(
+                  artist.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: 'Orbitron',
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1,
+                    color: Colors.white,
+                    shadows: [Shadow(color: accent, blurRadius: 14)],
                   ),
                 ),
-                alignment: const Alignment(0, -0.1),
-                child: Hero(
-                  tag: 'avatar-${artist.id}',
-                  child: ArtistAvatar(artist: artist, size: 88),
+                background: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Hero(
+                      tag: 'avatar-${artist.id}',
+                      child: ArtistCoverImage(artist: artist),
+                    ),
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            const Color(0x8005060F),
+                            const Color(0x0005060F),
+                            accent.withValues(alpha: 0.45),
+                            NeonColors.bg,
+                          ],
+                          stops: const [0, 0.3, 0.7, 1],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            SliverAppBar.large(
+              title: Text(artist.name),
+              expandedHeight: 220,
+              flexibleSpace: FlexibleSpaceBar(
+                background: Container(
+                  decoration: BoxDecoration(
+                    image: artist.cover == null
+                        ? null
+                        : DecorationImage(
+                            image: MemoryImage(artist.cover!),
+                            fit: BoxFit.cover,
+                            // Tiñe la portada con el color de la página.
+                            colorFilter: ColorFilter.mode(
+                              artist.color.withValues(alpha: 0.35),
+                              BlendMode.srcATop,
+                            ),
+                          ),
+                    gradient: LinearGradient(
+                      colors: [
+                        artist.color.withValues(alpha: 0.85),
+                        theme.colorScheme.surface,
+                      ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
+                  ),
+                  alignment: const Alignment(0, -0.1),
+                  child: Hero(
+                    tag: 'avatar-${artist.id}',
+                    child: ArtistAvatar(artist: artist, size: 88),
+                  ),
                 ),
               ),
             ),
-          ),
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 120),
             sliver: SliverList.list(
@@ -85,7 +147,7 @@ class ArtistDetailScreen extends StatelessWidget {
                       children: [
                         const Icon(Icons.place, size: 16),
                         Text(
-                          ' ${artist.distanceKm} km · ${artist.zone.contains('Caguas') ? artist.zone : '${artist.zone}, Caguas'}',
+                          ' ${artist.distanceKm} km · ${artist.zone}',
                         ),
                       ],
                     ),
@@ -98,7 +160,7 @@ class ArtistDetailScreen extends StatelessWidget {
                       artist.tagline,
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontStyle: FontStyle.italic,
-                        color: artist.color,
+                        color: accent,
                       ),
                     ),
                   ),
@@ -270,7 +332,9 @@ class ArtistDetailScreen extends StatelessWidget {
                         const Text('desde'),
                         Text(
                           money(artist.minPrice),
-                          style: theme.textTheme.titleLarge,
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            color: isFuturista(context) ? accent : null,
+                          ),
                         ),
                       ],
                     ),
@@ -319,10 +383,39 @@ class _SectionTitle extends StatelessWidget {
   final String text;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(top: 24, bottom: 8),
-    child: Text(text, style: Theme.of(context).textTheme.titleLarge),
-  );
+  Widget build(BuildContext context) {
+    final style = Theme.of(context).textTheme.titleLarge;
+    if (!isFuturista(context)) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 24, bottom: 8),
+        child: Text(text, style: style),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 28, bottom: 10),
+      child: Row(
+        children: [
+          Container(
+            width: 4,
+            height: 20,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(2),
+              gradient: LinearGradient(
+                colors: [
+                  Theme.of(context).colorScheme.primary,
+                  NeonColors.magenta,
+                ],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Text(text, style: style?.copyWith(fontSize: 15, letterSpacing: 2)),
+        ],
+      ),
+    );
+  }
 }
 
 class _VideoTile extends StatelessWidget {
