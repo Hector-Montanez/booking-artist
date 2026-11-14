@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../app_state.dart';
+import '../cloud.dart' show apiUri;
 import '../models.dart';
 import '../widgets/pickers.dart';
 import '../widgets/stage_slideshow.dart';
@@ -93,6 +95,7 @@ class _ClientSignupScreenState extends State<ClientSignupScreen>
   final _town = TextEditingController(text: 'Caguas');
   final _email = TextEditingController();
   final _phone = TextEditingController();
+  bool _smsOptIn = false;
   final _pass = TextEditingController();
 
   @override
@@ -184,6 +187,10 @@ class _ClientSignupScreenState extends State<ClientSignupScreen>
           decoration: _deco('Teléfono', Icons.phone, hint: '787 555 1234'),
           validator: _validPhone,
         ),
+        _SmsConsent(
+          value: _smsOptIn,
+          onChanged: (v) => setState(() => _smsOptIn = v),
+        ),
         TextFormField(
           controller: _email,
           keyboardType: TextInputType.emailAddress,
@@ -208,6 +215,7 @@ class _ClientSignupScreenState extends State<ClientSignupScreen>
         name: _name.text.trim(),
         email: _email.text.trim(),
         phone: _phone.text.trim(),
+        smsOptIn: _smsOptIn,
         clientType: _type,
         businessName: _type.hasBusinessName ? _business.text.trim() : '',
         address: _type == ClientType.restaurante ? _address.text.trim() : '',
@@ -235,6 +243,7 @@ class _ArtistSignupScreenState extends State<ArtistSignupScreen>
   final _genres = TextEditingController();
   final _email = TextEditingController();
   final _phone = TextEditingController();
+  bool _smsOptIn = false;
   final _pass = TextEditingController();
 
   @override
@@ -303,6 +312,10 @@ class _ArtistSignupScreenState extends State<ArtistSignupScreen>
           decoration: _deco('Teléfono', Icons.phone, hint: '787 555 1234'),
           validator: _validPhone,
         ),
+        _SmsConsent(
+          value: _smsOptIn,
+          onChanged: (v) => setState(() => _smsOptIn = v),
+        ),
         TextFormField(
           controller: _email,
           keyboardType: TextInputType.emailAddress,
@@ -355,6 +368,7 @@ class _ArtistSignupScreenState extends State<ArtistSignupScreen>
         name: _name.text.trim(),
         email: _email.text.trim(),
         phone: _phone.text.trim(),
+        smsOptIn: _smsOptIn,
         artist: artist,
         password: _pass.text,
       ),
@@ -488,5 +502,58 @@ mixin _CreatesAccount<T extends StatefulWidget> on State<T> {
       return;
     }
     Navigator.of(context).popUntil((r) => r.isFirst);
+  }
+}
+
+/// Permiso para enviar SMS. Las compañías de teléfono exigen que la persona lo
+/// acepte por su cuenta, así que empieza sin marcar y no es obligatorio.
+class _SmsConsent extends StatelessWidget {
+  const _SmsConsent({required this.value, required this.onChanged});
+
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return CheckboxListTile(
+      value: value,
+      onChanged: (v) => onChanged(v ?? false),
+      controlAffinity: ListTileControlAffinity.leading,
+      contentPadding: EdgeInsets.zero,
+      title: const Text(smsConsentTitle),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(smsConsentDetail),
+          Wrap(
+            spacing: 16,
+            children: [
+              _LegalLink('Términos de servicio', '/terminos.html'),
+              _LegalLink('Política de privacidad', '/privacidad.html'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LegalLink extends StatelessWidget {
+  const _LegalLink(this.label, this.path);
+
+  final String label;
+  final String path;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton(
+      style: TextButton.styleFrom(
+        padding: EdgeInsets.zero,
+        minimumSize: const Size(0, 32),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+      onPressed: () => launchUrl(apiUri(path)),
+      child: Text(label, style: const TextStyle(decoration: TextDecoration.underline)),
+    );
   }
 }
