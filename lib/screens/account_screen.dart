@@ -6,9 +6,14 @@ import '../cloud.dart' show apiUri;
 import '../models.dart';
 import '../theme.dart';
 
-class AccountScreen extends StatelessWidget {
+class AccountScreen extends StatefulWidget {
   const AccountScreen({super.key});
 
+  @override
+  State<AccountScreen> createState() => _AccountScreenState();
+}
+
+class _AccountScreenState extends State<AccountScreen> {
   @override
   Widget build(BuildContext context) {
     final state = AppScope.of(context);
@@ -49,6 +54,16 @@ class AccountScreen extends StatelessWidget {
                   leading: const Icon(Icons.email),
                   title: Text(a.email),
                 ),
+                SwitchListTile(
+                  secondary: const Icon(Icons.sms),
+                  title: const Text(smsConsentTitle),
+                  subtitle: const Text(smsConsentDetail),
+                  value: a.smsOptIn,
+                  onChanged: (v) {
+                    setState(() => a.smsOptIn = v);
+                    state.cloud?.saveSmsOptIn(v);
+                  },
+                ),
               ],
             ),
           ),
@@ -70,6 +85,14 @@ class AccountScreen extends StatelessWidget {
               title: const Text('Política de privacidad'),
               trailing: const Icon(Icons.open_in_new),
               onTap: () => launchUrl(apiUri('/privacidad.html')),
+            ),
+          ),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.description_outlined),
+              title: const Text('Términos de servicio'),
+              trailing: const Icon(Icons.open_in_new),
+              onTap: () => launchUrl(apiUri('/terminos.html')),
             ),
           ),
           if (!state.online) ...[

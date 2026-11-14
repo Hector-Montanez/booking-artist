@@ -603,6 +603,7 @@ class Account {
     this.town = 'Caguas',
     this.artist,
     this.password = '',
+    this.smsOptIn = false,
   });
 
   final UserRole role;
@@ -613,6 +614,10 @@ class Account {
   String businessName;
   String address;
   String town;
+
+  /// Aceptó recibir SMS sobre sus reservas. Sin esto el servidor no le envía
+  /// SMS (lo exigen las compañías de teléfono); los emails siguen llegando.
+  bool smsOptIn;
 
   /// Página pública del artista, si la cuenta es de artista.
   final Artist? artist;
@@ -688,3 +693,13 @@ class Conversation {
 
   DateTime? get lastAt => messages.isEmpty ? null : messages.last.sentAt;
 }
+
+/// Texto del permiso para SMS. Es el mismo que se describe en el registro del
+/// número toll-free de Twilio; si se cambia aquí, hay que cambiarlo allá.
+const smsConsentTitle =
+    'Acepto recibir mensajes de texto (SMS) de Tarima sobre mis reservas';
+const smsConsentDetail =
+    'Avisos de solicitudes nuevas, reservas aceptadas o rechazadas y pagos. '
+    'Sin publicidad. La cantidad de mensajes varía según tus reservas. '
+    'Pueden aplicar cargos por mensajes y datos. Responde HELP para ayuda '
+    'o STOP para cancelar. Es opcional: no hace falta para crear tu cuenta.';
