@@ -691,6 +691,8 @@ Map<String, dynamic> accountToMap(Account a) => {
   'businessName': a.businessName,
   'address': a.address,
   'town': a.town,
+  if (a.lat != null) 'lat': a.lat,
+  if (a.lng != null) 'lng': a.lng,
   'smsOptIn': a.smsOptIn,
 };
 
@@ -703,6 +705,8 @@ Account accountFromMap(Map<String, dynamic> d, Artist? artist) => Account(
   businessName: d['businessName'] ?? '',
   address: d['address'] ?? '',
   town: d['town'] ?? 'Caguas',
+  lat: (d['lat'] as num?)?.toDouble(),
+  lng: (d['lng'] as num?)?.toDouble(),
   artist: artist,
   smsOptIn: d['smsOptIn'] == true,
 );

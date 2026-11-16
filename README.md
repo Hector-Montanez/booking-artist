@@ -105,3 +105,9 @@ Vercel publica esa carpeta (ver `vercel.json`) y las funciones de `api/`, que so
 Para actualizarla: compilar, reemplazar `web_build/` con `build/web/` y hacer push a `main`.
 
 Sitio: https://booking-artist-khaki.vercel.app (se publica solo al hacer push a `main`).
+
+## Dirección con Google Maps (restaurantes y negocios)
+
+Cuando un cliente se registra como **restaurante o negocio**, escribe la dirección del local y escoge una de las sugerencias de Google Maps. La app llena la dirección y el **pueblo** (uno de los 78 municipios) solita; si Google no trae el pueblo, la persona lo escoge de la lista. También se guarda la ubicación (latitud y longitud) para calcular distancias más adelante. Los clientes privados escogen su pueblo de la lista.
+
+`vercel/api/places.js` hace la búsqueda desde el servidor, así la llave de Google nunca va dentro de la app. Variable de entorno en Vercel: `GOOGLE_MAPS_API_KEY` (llave de Google Cloud con **Places API (New)** activa). Sin la llave, la dirección es un campo de texto normal.

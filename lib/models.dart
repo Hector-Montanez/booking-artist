@@ -601,6 +601,8 @@ class Account {
     this.businessName = '',
     this.address = '',
     this.town = 'Caguas',
+    this.lat,
+    this.lng,
     this.artist,
     this.password = '',
     this.smsOptIn = false,
@@ -614,6 +616,10 @@ class Account {
   String businessName;
   String address;
   String town;
+
+  /// Ubicación del local según Google Maps (solo restaurantes y negocios).
+  double? lat;
+  double? lng;
 
   /// Aceptó recibir SMS sobre sus reservas. Sin esto el servidor no le envía
   /// SMS (lo exigen las compañías de teléfono); los emails siguen llegando.
