@@ -4,6 +4,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../app_state.dart';
 import '../cloud.dart' show apiUri;
 import '../models.dart';
+import '../places.dart' show PlaceDetails;
+import '../widgets/address_field.dart';
 import '../widgets/pickers.dart';
 import '../widgets/stage_slideshow.dart';
 
@@ -92,7 +94,10 @@ class _ClientSignupScreenState extends State<ClientSignupScreen>
   final _name = TextEditingController();
   final _business = TextEditingController();
   final _address = TextEditingController();
-  final _town = TextEditingController(text: 'Caguas');
+  String? _town;
+  bool _townFromMaps = false;
+  double? _lat;
+  double? _lng;
   final _email = TextEditingController();
   final _phone = TextEditingController();
   bool _smsOptIn = false;
@@ -100,15 +105,7 @@ class _ClientSignupScreenState extends State<ClientSignupScreen>
 
   @override
   void dispose() {
-    for (final c in [
-      _name,
-      _business,
-      _address,
-      _town,
-      _email,
-      _phone,
-      _pass,
-    ]) {
+    for (final c in [_name, _business, _address, _email, _phone, _pass]) {
       c.dispose();
     }
     super.dispose();
@@ -167,19 +164,16 @@ class _ClientSignupScreenState extends State<ClientSignupScreen>
           validator: _required,
         ),
         if (_type == ClientType.restaurante)
-          TextFormField(
-            controller: _address,
-            decoration: _deco(
-              'Dirección del local',
-              Icons.place,
-              hint: 'Calle, número, sector',
-            ),
-            validator: _required,
-          ),
-        TextFormField(
-          controller: _town,
-          decoration: _deco('Pueblo', Icons.location_city),
-          validator: _required,
+          AddressSearchField(controller: _address, onPicked: _addressPicked),
+        TownField(
+          value: _town,
+          helper: _type == ClientType.restaurante && _townFromMaps
+              ? 'Tomado de la dirección en Google Maps'
+              : null,
+          onChanged: (t) => setState(() {
+            _town = t;
+            _townFromMaps = false;
+          }),
         ),
         TextFormField(
           controller: _phone,
@@ -207,8 +201,31 @@ class _ClientSignupScreenState extends State<ClientSignupScreen>
     );
   }
 
+  void _addressPicked(PlaceDetails d) {
+    setState(() {
+      _lat = d.lat;
+      _lng = d.lng;
+      if (d.town != null) {
+        _town = d.town;
+        _townFromMaps = true;
+      } else {
+        _townFromMaps = false;
+      }
+    });
+    if (d.town == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'No encontramos el pueblo en esa dirección. Escógelo de la lista.',
+          ),
+        ),
+      );
+    }
+  }
+
   Future<void> _submit() async {
     if (_busy || !_form.currentState!.validate()) return;
+    final business = _type == ClientType.restaurante;
     await _create(
       Account(
         role: UserRole.cliente,
@@ -218,8 +235,10 @@ class _ClientSignupScreenState extends State<ClientSignupScreen>
         smsOptIn: _smsOptIn,
         clientType: _type,
         businessName: _type.hasBusinessName ? _business.text.trim() : '',
-        address: _type == ClientType.restaurante ? _address.text.trim() : '',
-        town: _town.text.trim(),
+        address: business ? _address.text.trim() : '',
+        town: _town!,
+        lat: business ? _lat : null,
+        lng: business ? _lng : null,
         password: _pass.text,
       ),
     );
@@ -553,7 +572,10 @@ class _LegalLink extends StatelessWidget {
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       ),
       onPressed: () => launchUrl(apiUri(path)),
-      child: Text(label, style: const TextStyle(decoration: TextDecoration.underline)),
+      child: Text(
+        label,
+        style: const TextStyle(decoration: TextDecoration.underline),
+      ),
     );
   }
 }
