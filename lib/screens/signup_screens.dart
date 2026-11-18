@@ -5,7 +5,9 @@ import '../app_state.dart';
 import '../cloud.dart' show apiUri;
 import '../models.dart';
 import '../widgets/pickers.dart';
+import '../theme.dart';
 import '../widgets/stage_slideshow.dart';
+import '../widgets/theme_picker.dart';
 
 String? _required(String? v) =>
     (v == null || v.trim().isEmpty) ? 'Campo requerido' : null;
@@ -122,6 +124,12 @@ class _ClientSignupScreenState extends State<ClientSignupScreen>
       formKey: _form,
       onSubmit: _busy ? null : _submit,
       children: [
+        ThemePicker(
+          title: 'Escoge el estilo de tu app',
+          hint: 'Puedes cambiarlo cuando quieras en Mi cuenta.',
+          onChanged: (s) => appStyle.value = s,
+        ),
+        const Divider(height: 24),
         Text(
           '¿Quién contrata?',
           style: Theme.of(context).textTheme.titleMedium,
@@ -216,6 +224,7 @@ class _ClientSignupScreenState extends State<ClientSignupScreen>
         email: _email.text.trim(),
         phone: _phone.text.trim(),
         smsOptIn: _smsOptIn,
+        theme: appStyle.value.name,
         clientType: _type,
         businessName: _type.hasBusinessName ? _business.text.trim() : '',
         address: _type == ClientType.restaurante ? _address.text.trim() : '',
@@ -261,6 +270,12 @@ class _ArtistSignupScreenState extends State<ArtistSignupScreen>
       formKey: _form,
       onSubmit: _busy ? null : _submit,
       children: [
+        ThemePicker(
+          title: 'Escoge el estilo de tu app',
+          hint: 'Puedes cambiarlo cuando quieras en Mi cuenta.',
+          onChanged: (s) => appStyle.value = s,
+        ),
+        const Divider(height: 24),
         Text(
           '¿Qué tipo de artista eres?',
           style: Theme.of(context).textTheme.titleMedium,
@@ -369,6 +384,7 @@ class _ArtistSignupScreenState extends State<ArtistSignupScreen>
         email: _email.text.trim(),
         phone: _phone.text.trim(),
         smsOptIn: _smsOptIn,
+        theme: appStyle.value.name,
         artist: artist,
         password: _pass.text,
       ),
@@ -553,7 +569,10 @@ class _LegalLink extends StatelessWidget {
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       ),
       onPressed: () => launchUrl(apiUri(path)),
-      child: Text(label, style: const TextStyle(decoration: TextDecoration.underline)),
+      child: Text(
+        label,
+        style: const TextStyle(decoration: TextDecoration.underline),
+      ),
     );
   }
 }

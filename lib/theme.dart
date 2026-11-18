@@ -1,17 +1,39 @@
 import 'package:flutter/material.dart';
 
-/// Los dos estilos visuales de la app. Se cambian desde "Mi cuenta" o desde
-/// el botón de la pantalla de bienvenida, y en la web también con
+/// Los tres estilos visuales de la app. Cada persona escoge el suyo al crear
+/// la cuenta (con miniaturas) y lo puede cambiar en "Mi cuenta"; se guarda en
+/// su cuenta. En la web también se puede ver con `?estilo=claro`,
 /// `?estilo=clasico` o `?estilo=futurista` al final del enlace.
-enum AppStyle { clasico, futurista }
+enum AppStyle {
+  futurista('Futurista', 'Oscuro con luces neón'),
+  claro('Claro', 'Blanco con colores vivos'),
+  clasico('Clásico', 'El diseño original, en morado');
+
+  const AppStyle(this.label, this.detail);
+
+  final String label;
+  final String detail;
+
+  /// El estilo guardado en la cuenta, o null si no hay uno válido.
+  static AppStyle? fromName(String? name) {
+    final n = name?.toLowerCase().replaceAll('á', 'a');
+    return AppStyle.values.where((s) => s.name == n).firstOrNull;
+  }
+}
 
 final appStyle = ValueNotifier<AppStyle>(_initialStyle());
 
-AppStyle _initialStyle() {
-  final q = Uri.base.queryParameters['estilo']?.toLowerCase();
-  if (q == 'clasico' || q == 'clásico') return AppStyle.clasico;
-  return AppStyle.futurista;
-}
+AppStyle _initialStyle() =>
+    AppStyle.fromName(Uri.base.queryParameters['estilo']) ?? AppStyle.futurista;
+
+ThemeData themeFor(AppStyle style, Brightness b) => switch (style) {
+  AppStyle.futurista => futuristTheme(),
+  AppStyle.claro => claroTheme(),
+  AppStyle.clasico => classicTheme(b),
+};
+
+bool isClaro(BuildContext context) =>
+    Theme.of(context).extension<Bright>() != null;
 
 bool isFuturista(BuildContext context) =>
     Theme.of(context).extension<Neon>() != null;
@@ -319,18 +341,19 @@ class _GridPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-/// Botón para cambiar entre el estilo clásico y el futurista.
+/// Botón para pasar al siguiente estilo (futurista, claro, clásico).
 class StyleToggleButton extends StatelessWidget {
   const StyleToggleButton({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final fut = appStyle.value == AppStyle.futurista;
+    final next =
+        AppStyle.values[(appStyle.value.index + 1) % AppStyle.values.length];
     return IconButton(
-      tooltip: fut ? 'Ver estilo clásico' : 'Ver estilo futurista',
-      icon: Icon(fut ? Icons.palette_outlined : Icons.auto_awesome),
-      onPressed: () =>
-          appStyle.value = fut ? AppStyle.clasico : AppStyle.futurista,
+      tooltip: 'Ver estilo ${next.label.toLowerCase()}',
+      color: Colors.white,
+      icon: const Icon(Icons.palette_outlined),
+      onPressed: () => appStyle.value = next,
     );
   }
 }
@@ -347,10 +370,19 @@ Color neonAccent(Color c) {
       .toColor();
 }
 
+/// Color de acento que se lee bien sobre el fondo blanco del estilo claro:
+/// los colores muy claros se oscurecen un poco.
+Color brightAccent(Color c) {
+  final hsl = HSLColor.fromColor(c);
+  return hsl.withLightness(hsl.lightness.clamp(0.3, 0.52)).toColor();
+}
+
 /// Tema de la página de un artista: usa el color que el artista escogió para
 /// los botones, precios, etiquetas y la portada.
 ThemeData artistPageTheme(ThemeData base, Color color) {
-  if (base.extension<Neon>() == null) {
+  final neon = base.extension<Neon>() != null;
+  final bright = base.extension<Bright>() != null;
+  if (!neon && !bright) {
     return base.copyWith(
       colorScheme: ColorScheme.fromSeed(
         seedColor: color,
@@ -359,17 +391,21 @@ ThemeData artistPageTheme(ThemeData base, Color color) {
       ),
     );
   }
-  final accent = neonAccent(color);
+  final accent = neon ? neonAccent(color) : brightAccent(color);
   final onAccent = accent.computeLuminance() > 0.4
       ? const Color(0xFF05060F)
       : Colors.white;
-  final soft = BorderSide(color: accent.withValues(alpha: 0.35));
+  final soft = BorderSide(color: accent.withValues(alpha: neon ? 0.35 : 0.22));
   return base.copyWith(
     colorScheme: base.colorScheme.copyWith(
       primary: accent,
       onPrimary: onAccent,
-      primaryContainer: Color.lerp(accent, NeonColors.bg, 0.7),
-      onPrimaryContainer: accent,
+      primaryContainer: neon
+          ? Color.lerp(accent, NeonColors.bg, 0.7)
+          : Color.lerp(accent, Colors.white, 0.85),
+      onPrimaryContainer: neon
+          ? accent
+          : Color.lerp(accent, Colors.black, 0.45),
     ),
     cardTheme: base.cardTheme.copyWith(
       shape: RoundedRectangleBorder(
@@ -404,4 +440,226 @@ ThemeData artistPageTheme(ThemeData base, Color color) {
       style: IconButton.styleFrom(foregroundColor: accent),
     ),
   );
+}
+
+// ---------------------------------------------------------------------------
+// Estilo claro: fondo blanco con colores vivos (coral, turquesa, mango y
+// violeta), alegre y fácil de leer de día.
+// ---------------------------------------------------------------------------
+
+/// Colores del estilo claro.
+abstract final class ClaroColors {
+  static const bg = Color(0xFFF6F7FB);
+  static const card = Colors.white;
+  static const coral = Color(0xFFF2385A);
+  static const orange = Color(0xFFFF7A45);
+  static const turquoise = Color(0xFF00B8A9);
+  static const mango = Color(0xFFFFB020);
+  static const violet = Color(0xFF7C4DFF);
+  static const text = Color(0xFF1B1D2A);
+  static const muted = Color(0xFF6B7085);
+  static const line = Color(0xFFE6E8F0);
+
+  static const gradient = LinearGradient(
+    colors: [orange, coral, violet],
+    begin: Alignment.centerLeft,
+    end: Alignment.centerRight,
+  );
+}
+
+/// Marca el tema claro para que las pantallas puedan cambiar su diseño.
+class Bright extends ThemeExtension<Bright> {
+  const Bright();
+
+  @override
+  Bright copyWith() => this;
+
+  @override
+  Bright lerp(Bright? other, double t) => this;
+}
+
+ThemeData claroTheme() {
+  const scheme = ColorScheme(
+    brightness: Brightness.light,
+    primary: ClaroColors.coral,
+    onPrimary: Colors.white,
+    primaryContainer: Color(0xFFFFE1E7),
+    onPrimaryContainer: Color(0xFF8C0F2C),
+    secondary: ClaroColors.turquoise,
+    onSecondary: Colors.white,
+    secondaryContainer: Color(0xFFD5F6F2),
+    onSecondaryContainer: Color(0xFF00524B),
+    tertiary: ClaroColors.violet,
+    onTertiary: Colors.white,
+    tertiaryContainer: Color(0xFFEDE5FF),
+    onTertiaryContainer: Color(0xFF3B1E8F),
+    error: Color(0xFFD32F2F),
+    onError: Colors.white,
+    surface: Colors.white,
+    onSurface: ClaroColors.text,
+    onSurfaceVariant: ClaroColors.muted,
+    surfaceContainerLowest: Colors.white,
+    surfaceContainerLow: Color(0xFFFAFBFE),
+    surfaceContainer: ClaroColors.bg,
+    surfaceContainerHigh: Color(0xFFEFF1F7),
+    surfaceContainerHighest: Color(0xFFE8EBF3),
+    outline: Color(0xFFCDD1DE),
+    outlineVariant: ClaroColors.line,
+  );
+  final base = ThemeData(
+    useMaterial3: true,
+    colorScheme: scheme,
+    fontFamily: _body,
+    scaffoldBackgroundColor: ClaroColors.bg,
+  );
+  final t = base.textTheme;
+  TextStyle? d(TextStyle? s) =>
+      s?.copyWith(fontWeight: FontWeight.w800, color: ClaroColors.text);
+  const soft = BorderSide(color: ClaroColors.line);
+  final round = BorderRadius.circular(18);
+  return base.copyWith(
+    extensions: const [Bright()],
+    textTheme: t.copyWith(
+      displayLarge: d(t.displayLarge),
+      displayMedium: d(t.displayMedium),
+      displaySmall: d(t.displaySmall),
+      headlineLarge: d(t.headlineLarge),
+      headlineMedium: d(t.headlineMedium),
+      headlineSmall: d(t.headlineSmall),
+      titleLarge: d(t.titleLarge),
+      titleMedium: t.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+    ),
+    appBarTheme: const AppBarTheme(
+      backgroundColor: Colors.white,
+      surfaceTintColor: Colors.transparent,
+      foregroundColor: ClaroColors.text,
+      elevation: 0,
+      scrolledUnderElevation: 1,
+      shadowColor: Color(0x22000000),
+      titleTextStyle: TextStyle(
+        fontFamily: _body,
+        fontWeight: FontWeight.w800,
+        fontSize: 20,
+        color: ClaroColors.text,
+      ),
+    ),
+    cardTheme: CardThemeData(
+      color: ClaroColors.card,
+      surfaceTintColor: Colors.transparent,
+      elevation: 2,
+      shadowColor: const Color(0x14000000),
+      shape: RoundedRectangleBorder(borderRadius: round, side: soft),
+    ),
+    chipTheme: ChipThemeData(
+      backgroundColor: Colors.white,
+      selectedColor: ClaroColors.coral.withValues(alpha: 0.14),
+      side: soft,
+      shape: const StadiumBorder(),
+      labelStyle: const TextStyle(color: ClaroColors.text),
+      iconTheme: const IconThemeData(color: ClaroColors.coral, size: 18),
+      checkmarkColor: ClaroColors.coral,
+    ),
+    navigationBarTheme: NavigationBarThemeData(
+      backgroundColor: Colors.white,
+      surfaceTintColor: Colors.transparent,
+      elevation: 3,
+      shadowColor: const Color(0x22000000),
+      indicatorColor: ClaroColors.coral.withValues(alpha: 0.14),
+      iconTheme: WidgetStateProperty.resolveWith(
+        (s) => IconThemeData(
+          color: s.contains(WidgetState.selected)
+              ? ClaroColors.coral
+              : ClaroColors.muted,
+        ),
+      ),
+      labelTextStyle: WidgetStateProperty.resolveWith(
+        (s) => TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: s.contains(WidgetState.selected)
+              ? ClaroColors.coral
+              : ClaroColors.muted,
+        ),
+      ),
+    ),
+    filledButtonTheme: FilledButtonThemeData(
+      style: FilledButton.styleFrom(
+        backgroundColor: ClaroColors.coral,
+        foregroundColor: Colors.white,
+        textStyle: const TextStyle(
+          fontFamily: _body,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.3,
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      ),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(
+        foregroundColor: ClaroColors.coral,
+        side: const BorderSide(color: ClaroColors.coral),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      ),
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(foregroundColor: ClaroColors.coral),
+    ),
+    floatingActionButtonTheme: const FloatingActionButtonThemeData(
+      backgroundColor: ClaroColors.turquoise,
+      foregroundColor: Colors.white,
+    ),
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      fillColor: Colors.white,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: soft,
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: soft,
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: ClaroColors.coral, width: 1.6),
+      ),
+    ),
+    searchBarTheme: SearchBarThemeData(
+      backgroundColor: const WidgetStatePropertyAll(Colors.white),
+      surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
+      elevation: const WidgetStatePropertyAll(1),
+      side: const WidgetStatePropertyAll(soft),
+      shape: WidgetStatePropertyAll(
+        RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      ),
+      hintStyle: const WidgetStatePropertyAll(
+        TextStyle(color: ClaroColors.muted),
+      ),
+    ),
+    dialogTheme: const DialogThemeData(backgroundColor: Colors.white),
+    bottomSheetTheme: const BottomSheetThemeData(backgroundColor: Colors.white),
+    dividerTheme: const DividerThemeData(color: ClaroColors.line),
+    snackBarTheme: const SnackBarThemeData(
+      backgroundColor: ClaroColors.text,
+      contentTextStyle: TextStyle(color: Colors.white),
+    ),
+  );
+}
+
+/// Texto con el degradado del estilo claro (naranja, coral, violeta).
+class BrightText extends StatelessWidget {
+  const BrightText(this.text, {super.key, this.style, this.textAlign});
+
+  final String text;
+  final TextStyle? style;
+  final TextAlign? textAlign;
+
+  @override
+  Widget build(BuildContext context) {
+    return ShaderMask(
+      blendMode: BlendMode.srcIn,
+      shaderCallback: (r) => ClaroColors.gradient.createShader(r),
+      child: Text(text, textAlign: textAlign, style: style),
+    );
+  }
 }

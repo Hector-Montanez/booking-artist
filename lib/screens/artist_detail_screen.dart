@@ -374,7 +374,9 @@ class ArtistDetailScreen extends StatelessWidget {
                         Text(
                           money(artist.minPrice),
                           style: theme.textTheme.titleLarge?.copyWith(
-                            color: isFuturista(context) ? accent : null,
+                            color: isFuturista(context) || isClaro(context)
+                                ? accent
+                                : null,
                           ),
                         ),
                       ],

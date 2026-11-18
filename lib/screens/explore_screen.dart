@@ -77,6 +77,15 @@ class _ExploreScreenState extends State<ExploreScreen> {
                       ),
                     ),
                     const SizedBox(height: 10),
+                  ] else if (isClaro(context)) ...[
+                    BrightText(
+                      'Tarima',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
                   ],
                   Row(
                     children: [
@@ -97,6 +106,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   const SizedBox(height: 8),
                   if (isFuturista(context))
                     NeonText(
+                      title,
+                      style: Theme.of(context).textTheme.headlineSmall,
+                    )
+                  else if (isClaro(context))
+                    BrightText(
                       title,
                       style: Theme.of(context).textTheme.headlineSmall,
                     )

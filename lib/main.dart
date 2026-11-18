@@ -39,12 +39,11 @@ class BookingArtistApp extends StatelessWidget {
           GlobalWidgetsLocalizations.delegate,
           GlobalCupertinoLocalizations.delegate,
         ],
-        theme: style == AppStyle.futurista
-            ? futuristTheme()
-            : classicTheme(Brightness.light),
-        darkTheme: style == AppStyle.futurista
-            ? futuristTheme()
-            : classicTheme(Brightness.dark),
+        theme: themeFor(style, Brightness.light),
+        darkTheme: themeFor(style, Brightness.dark),
+        // El cambio de estilo es inmediato: los tres temas usan letras
+        // distintas y no se pueden mezclar en una animación.
+        themeAnimationDuration: Duration.zero,
         home: const RootGate(),
       ),
     );

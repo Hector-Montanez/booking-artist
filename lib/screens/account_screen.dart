@@ -4,7 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../app_state.dart';
 import '../cloud.dart' show apiUri;
 import '../models.dart';
-import '../theme.dart';
+import '../widgets/theme_picker.dart';
 
 class AccountScreen extends StatefulWidget {
   const AccountScreen({super.key});
@@ -69,13 +69,12 @@ class _AccountScreenState extends State<AccountScreen> {
           ),
           const SizedBox(height: 16),
           Card(
-            child: SwitchListTile(
-              secondary: const Icon(Icons.auto_awesome),
-              title: const Text('Estilo futurista'),
-              subtitle: const Text('Apágalo para ver el diseño clásico.'),
-              value: appStyle.value == AppStyle.futurista,
-              onChanged: (v) =>
-                  appStyle.value = v ? AppStyle.futurista : AppStyle.clasico,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: ThemePicker(
+                title: 'Estilo de la app',
+                onChanged: state.setStyle,
+              ),
             ),
           ),
           const SizedBox(height: 16),

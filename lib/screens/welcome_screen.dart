@@ -165,8 +165,13 @@ class _RoleCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final neon = isFuturista(context);
+    final bright = isClaro(context);
     return Card(
-      color: neon ? const Color(0xCC05060F) : const Color(0xCC1A1424),
+      color: neon
+          ? const Color(0xCC05060F)
+          : bright
+          ? const Color(0xF2FFFFFF)
+          : const Color(0xCC1A1424),
       shape: neon
           ? RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(18),

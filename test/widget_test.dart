@@ -1,6 +1,7 @@
 import 'package:booking_artist/app_state.dart';
 import 'package:booking_artist/main.dart';
 import 'package:booking_artist/models.dart';
+import 'package:booking_artist/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -8,7 +9,7 @@ void main() {
   testWidgets('Un restaurante crea su cuenta y ve los artistas', (
     tester,
   ) async {
-    tester.view.physicalSize = const Size(1080, 4400);
+    tester.view.physicalSize = const Size(1080, 5400);
     tester.view.devicePixelRatio = 2.5;
     addTearDown(tester.view.reset);
     final state = AppState();
@@ -19,6 +20,11 @@ void main() {
 
     await tester.tap(find.text('Quiero contratar'));
     await tester.pumpAndSettle();
+    // Escoge el estilo claro con su miniatura: la app cambia enseguida.
+    addTearDown(() => appStyle.value = AppStyle.futurista);
+    await tester.tap(find.text('Claro'));
+    await tester.pumpAndSettle();
+    expect(appStyle.value, AppStyle.claro);
     await tester.tap(find.text('Restaurante o negocio'));
     await tester.pumpAndSettle();
     final fields = find.byType(TextFormField);
@@ -39,6 +45,11 @@ void main() {
     expect(state.account?.clientType, ClientType.restaurante);
     expect(state.account?.displayName, 'El Patio');
     expect(state.account?.smsOptIn, isTrue);
+    expect(state.account?.theme, 'claro');
+    // Cambia de estilo desde su cuenta y se guarda.
+    state.setStyle(AppStyle.clasico);
+    expect(state.account?.theme, 'clasico');
+    expect(appStyle.value, AppStyle.clasico);
     expect(find.text('Puerto Rico'), findsOneWidget);
     await tester.tap(find.text('Sofía Rivera'));
     await tester.pumpAndSettle();
@@ -46,7 +57,7 @@ void main() {
   });
 
   testWidgets('Un artista crea su cuenta y edita su página', (tester) async {
-    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.physicalSize = const Size(1080, 4000);
     tester.view.devicePixelRatio = 2.5;
     addTearDown(tester.view.reset);
     final state = AppState();

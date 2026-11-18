@@ -457,6 +457,11 @@ class Cloud {
     _col('users').doc(uid).update({'smsOptIn': value}).catchError(_ignore);
   }
 
+  /// Guarda el estilo visual que escogió la persona.
+  void saveTheme(String value) {
+    _col('users').doc(uid).update({'theme': value}).catchError(_ignore);
+  }
+
   void saveNotification(AppNotification n) {
     final doc = _col('notifications').doc();
     n.id = doc.id;
@@ -692,6 +697,7 @@ Map<String, dynamic> accountToMap(Account a) => {
   'address': a.address,
   'town': a.town,
   'smsOptIn': a.smsOptIn,
+  'theme': ?a.theme,
 };
 
 Account accountFromMap(Map<String, dynamic> d, Artist? artist) => Account(
@@ -705,6 +711,7 @@ Account accountFromMap(Map<String, dynamic> d, Artist? artist) => Account(
   town: d['town'] ?? 'Caguas',
   artist: artist,
   smsOptIn: d['smsOptIn'] == true,
+  theme: d['theme'] as String?,
 );
 
 /// Las fotos se guardan dentro del documento (máximo ~1 MB por documento),

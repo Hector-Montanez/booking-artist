@@ -605,6 +605,7 @@ class Account {
     this.artist,
     this.password = '',
     this.smsOptIn = false,
+    this.theme,
   });
 
   final UserRole role;
@@ -619,6 +620,10 @@ class Account {
   /// Aceptó recibir SMS sobre sus reservas. Sin esto el servidor no le envía
   /// SMS (lo exigen las compañías de teléfono); los emails siguen llegando.
   bool smsOptIn;
+
+  /// Estilo visual que escogió (futurista, claro o clasico). Null si la
+  /// cuenta es de antes de poder escogerlo.
+  String? theme;
 
   /// Página pública del artista, si la cuenta es de artista.
   final Artist? artist;
