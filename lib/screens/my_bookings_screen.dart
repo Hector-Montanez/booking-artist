@@ -76,7 +76,7 @@ class MyBookingsScreen extends StatelessWidget {
                         const SizedBox(height: 4),
                         Text(
                           b.noDeposit
-                              ? 'Restaurante: el pago se '
+                              ? 'El pago se '
                                     'arregla directo con el artista'
                               : b.payment == PaymentStatus.porPagar
                               ? '${money(b.amountCharged)} · ${b.payment.label}'

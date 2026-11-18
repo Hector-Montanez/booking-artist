@@ -212,7 +212,7 @@ class ArtistDetailScreen extends StatelessWidget {
                       subtitle: Text(
                         [
                           '${_hours(p.hours)} de presentación · '
-                              '${p.paidInApp ? 'Actividad (pago por la app)' : 'Restaurante (pago directo al artista)'}',
+                              '${p.kind.label}',
                           if (p.description.isNotEmpty) p.description,
                         ].join('\n'),
                       ),
@@ -254,7 +254,7 @@ class ArtistDetailScreen extends StatelessWidget {
                       'Paquetes de actividades: se paga el total por la app '
                           'al reservar.',
                     if (artist.packages.any((p) => !p.paidInApp))
-                      'Paquetes de restaurante: solo la reserva; el pago se '
+                      'Por la app solo se reserva la fecha; el pago se '
                           'arregla directo con el artista.',
                     artist.conditions,
                   ].join(' '),

@@ -50,18 +50,23 @@ class _BookingScreenState extends State<BookingScreen> {
   PricePackage _defaultPackage() {
     final packages = widget.artist.packages;
     if (AppScope.of(context).account?.clientType == ClientType.restaurante) {
-      return packages.where((p) => !p.paidInApp).firstOrNull ?? packages.first;
+      return packages
+              .where((p) => p.kind == PackageKind.restaurante)
+              .firstOrNull ??
+          packages.first;
     }
     return packages.first;
   }
 
-  /// Paquete de restaurante: no se paga por la app, solo la reserva.
+  /// No se paga por la app, solo la reserva (todas en el MVP).
   bool get _noDeposit => !_package.paidInApp;
 
   /// Tipos de evento que van con el paquete: los de restaurante son para
   /// restaurantes; los de actividades, para todo lo demás.
   List<EventType> get _eventTypes {
-    if (_noDeposit) return const [EventType.restaurante];
+    if (_package.kind == PackageKind.restaurante) {
+      return const [EventType.restaurante];
+    }
     final types = widget.artist.eventTypes
         .where((e) => e != EventType.restaurante)
         .toList();
@@ -127,9 +132,7 @@ class _BookingScreenState extends State<BookingScreen> {
                     RadioListTile<PricePackage>(
                       value: p,
                       title: Text(p.name),
-                      subtitle: Text(
-                        '${p.hours} h · ${p.paidInApp ? 'Actividad, pago por la app' : 'Restaurante, pago directo al artista'}',
-                      ),
+                      subtitle: Text('${p.hours} h · ${p.kind.label}'),
                       secondary: Text(
                         money(p.price),
                         style: const TextStyle(fontWeight: FontWeight.bold),
@@ -254,8 +257,8 @@ class _BookingScreenState extends State<BookingScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                'En los paquetes de restaurante no pagas nada por la app: reservas '
-                'la fecha. El pago se arregla directo con ${artist.name}.',
+                'No pagas nada por la app: reservas la fecha y el pago se '
+                'arregla directo con ${artist.name}.',
                 style: theme.textTheme.bodySmall,
               ),
             ] else ...[
@@ -404,7 +407,7 @@ class _BookingScreenState extends State<BookingScreen> {
     );
 
     if (_noDeposit) {
-      // Paquete de restaurante: no hay pago, solo la solicitud.
+      // Sin pago por la app: solo la solicitud.
       String? error;
       if (state.serverPayments) {
         setState(() => _sending = true);
@@ -466,7 +469,7 @@ Future<void> showPaidDialog(BuildContext context, Booking b) {
   final amount = money(b.amountCharged);
   final name = b.artist.name;
   final how = b.noDeposit
-      ? 'No pagaste nada: es un paquete de restaurante. El pago '
+      ? 'No pagaste nada por la app. El pago '
             'se arregla directo con $name.'
       : b.paymentMethod == PaymentMethod.ath
       ? 'Pagaste $amount con ATH Móvil. Si $name no acepta, te devolvemos el '

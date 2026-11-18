@@ -77,7 +77,6 @@ class ArtistPanelScreen extends StatelessWidget {
                 title: Text(p.name),
                 subtitle: Text(
                   '${p.kind.label} · '
-                  '${p.paidInApp ? 'pago por la app' : 'pago directo'} · '
                   '${p.hours} h${p.description.isEmpty ? '' : ' · ${p.description}'}',
                 ),
                 trailing: Text(
@@ -399,8 +398,7 @@ class _RequestCard extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               b.noDeposit
-                  ? 'Restaurante: ${money(b.total)} a pagar '
-                        'directo al artista'
+                  ? '${money(b.total)} a pagar directo al artista'
                   : '${b.payDeposit ? 'Depósito' : 'Pago completo'} '
                         '(${b.paidWith}): '
                         '${money(b.amountCharged)} de ${money(b.total)} · '

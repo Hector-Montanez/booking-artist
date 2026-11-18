@@ -104,8 +104,12 @@ void main() {
       final state = AppState();
       await state.login(AppState.demoClientEmail, AppState.demoPassword);
       final sofia = state.artists.firstWhere((a) => a.id == 'a1');
-      final cena = sofia.packages.firstWhere((p) => !p.paidInApp);
-      final boda = sofia.packages.firstWhere((p) => p.paidInApp);
+      final cena = sofia.packages.firstWhere(
+        (p) => p.kind == PackageKind.restaurante,
+      );
+      final boda = sofia.packages.firstWhere(
+        (p) => p.kind == PackageKind.actividad,
+      );
 
       await tester.pumpWidget(
         AppScope(
@@ -121,8 +125,9 @@ void main() {
 
       await tester.tap(find.text(boda.name));
       await tester.pumpAndSettle();
-      // Las actividades se pagan completas: ya no hay opción de depósito.
-      expect(find.textContaining('Continuar al pago'), findsOneWidget);
+      // MVP: las actividades tampoco se pagan por la app.
+      expect(find.text('Enviar solicitud'), findsOneWidget);
+      expect(find.textContaining('Continuar al pago'), findsNothing);
       expect(find.textContaining('Depósito'), findsNothing);
     },
   );
@@ -165,6 +170,7 @@ void main() {
     final sofia = state.artists.firstWhere((a) => a.id == 'a1');
     await show(ArtistDetailScreen(artist: sofia));
     await tester.scrollUntilVisible(find.text('Reseñas'), 300);
+    await tester.scrollUntilVisible(find.text('Restaurante El Patio'), 200);
     expect(find.text('Restaurante El Patio'), findsWidgets);
   });
 }

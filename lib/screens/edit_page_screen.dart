@@ -264,8 +264,8 @@ class _EditPageScreenState extends State<EditPageScreen> {
           Text('Condiciones de reserva', style: theme.textTheme.titleMedium),
           const SizedBox(height: 4),
           const Text(
-            'Los paquetes de actividades se pagan completos por la app al '
-            'reservar; los de restaurante se pagan directo contigo.',
+            'Los clientes reservan la fecha por la app y te pagan directo a '
+            'ti. Tarima no cobra nada de las reservas.',
           ),
           const SizedBox(height: 8),
           TextField(

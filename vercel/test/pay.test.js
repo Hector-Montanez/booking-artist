@@ -45,6 +45,7 @@ process.env.STRIPE_SECRET_KEY = 'sk_test_x';
 process.env.ATHM_PUBLIC_TOKEN = 'pub';
 process.env.ATHM_PRIVATE_TOKEN = 'priv';
 process.env.FIREBASE_SERVICE_ACCOUNT = '{}';
+process.env.IN_APP_PAYMENTS = 'on';
 const handler = require(process.argv[2] || require("path").join(__dirname, "../api/pay.js"));
 const call = (body, uid = 'client1') => new Promise((resolve) => {
   callerUid = uid;
@@ -137,6 +138,19 @@ const assert = require('assert');
   mk('b8');
   r = await call({ action: 'start', bookingId: 'b8', method: 'ninguno' });
   assert.equal(r.code, 400);
+
+  // MVP (pagos apagados): una actividad también se reserva sin pagar nada.
+  delete process.env.IN_APP_PAYMENTS;
+  mk('b10');
+  r = await call({ action: 'start', bookingId: 'b10', method: 'ninguno' });
+  assert.equal(r.payment, 'sinPago');
+  assert.equal(store['bookings/b10'].amountCharged, 0);
+  assert.equal(store['bookings/b10'].fee, 0);
+  assert.equal(store['bookings/b10'].total, 175);
+  mk('b11');
+  r = await call({ action: 'start', bookingId: 'b11', method: 'tarjeta' });
+  assert.equal(r.payment, 'sinPago', 'no se cobra aunque pidan tarjeta');
+  process.env.IN_APP_PAYMENTS = 'on';
 
   // Artista sin suscripción ni mes gratis: no se le puede reservar.
   store['subscriptions/art1'] = { status: 'canceled', trialEnd: Date.now() - 1000, paidUntil: Date.now() + 86400000 };

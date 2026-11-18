@@ -77,8 +77,15 @@ extension EventTypeInfo on EventType {
   };
 }
 
-/// Para qué es un paquete. Los de actividades se pagan completos por la app;
-/// los de restaurante son solo la reserva, sin pagar nada por la app.
+/// Pagos de reservas por la app. En el MVP están apagados: el cliente solo
+/// reserva la fecha y le paga directo al artista. Tarima solo cobra la
+/// membresía del artista. El servidor (/api/pay) tiene el mismo interruptor
+/// (IN_APP_PAYMENTS en Vercel).
+const inAppPayments = false;
+
+/// Para qué es un paquete: restaurantes o actividades (bodas, cumpleaños…).
+/// Si se encienden los pagos, los de actividades se pagan por la app; los de
+/// restaurante siempre son solo la reserva.
 enum PackageKind { actividad, restaurante }
 
 extension PackageKindInfo on PackageKind {
@@ -88,10 +95,8 @@ extension PackageKindInfo on PackageKind {
   };
 
   String get description => switch (this) {
-    PackageKind.actividad =>
-      'Bodas, cumpleaños, actividades. El cliente paga por la app al reservar.',
-    PackageKind.restaurante =>
-      'El cliente solo reserva la fecha y te paga directo.',
+    PackageKind.actividad => 'Bodas, cumpleaños y actividades.',
+    PackageKind.restaurante => 'Para restaurantes y negocios.',
   };
 
   IconData get icon => switch (this) {
@@ -116,8 +121,9 @@ class PricePackage {
   String description;
   PackageKind kind;
 
-  /// Solo los paquetes de actividades se pagan por la app al reservar.
-  bool get paidInApp => kind == PackageKind.actividad;
+  /// Se paga por la app al reservar (solo actividades, y solo con los pagos
+  /// encendidos).
+  bool get paidInApp => inAppPayments && kind == PackageKind.actividad;
 }
 
 /// Reseña que deja un cliente después de un evento confirmado. Una por
@@ -526,7 +532,7 @@ class Booking {
   double amountCharged;
   final bool payDeposit;
 
-  /// Paquete de restaurante: se reservó sin pagar nada por la app;
+  /// Se reservó sin pagar nada por la app;
   /// el pago se arregla directo con el artista.
   final bool noDeposit;
 
