@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'cloud.dart';
 import 'data/mock_artists.dart';
 import 'models.dart';
+import 'theme.dart';
 
 /// Estado en memoria del prototipo. Más adelante esto vendrá de un backend.
 class AppState extends ChangeNotifier {
@@ -300,6 +301,9 @@ class AppState extends ChangeNotifier {
 
   void signIn(Account a) {
     account = a;
+    // Cada cuenta ve la app con el estilo que escogió.
+    final style = AppStyle.fromName(a.theme);
+    if (style != null) appStyle.value = style;
     if (!accounts.contains(a)) accounts.add(a);
     if (a.artist != null && a.artist!.email.isEmpty) a.artist!.email = a.email;
     final artist = a.artist;
@@ -331,6 +335,15 @@ class AppState extends ChangeNotifier {
     if (a.artist != null) artists.remove(a.artist);
     signOut();
     return null;
+  }
+
+  /// Cambia el estilo visual y lo guarda en la cuenta.
+  void setStyle(AppStyle style) {
+    appStyle.value = style;
+    final a = account;
+    if (a == null) return;
+    a.theme = style.name;
+    cloud?.saveTheme(style.name);
   }
 
   void signOut() {
