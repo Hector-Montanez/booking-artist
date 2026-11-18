@@ -358,7 +358,6 @@ List<Artist> _mockArtists() => [
       EventType.restaurante,
       EventType.boda,
     },
-    depositPercent: 20,
     packages: [
       PricePackage(name: 'Toque con agrupación', price: 120, hours: 3),
       PricePackage(name: 'Ensayo', price: 40, hours: 2),
@@ -386,7 +385,6 @@ List<Artist> _mockArtists() => [
     reviews: 17,
     color: const Color(0xFF00695C),
     eventTypes: {EventType.conAgrupacion, EventType.boda},
-    depositPercent: 20,
     packages: [
       PricePackage(name: 'Toque con agrupación', price: 110, hours: 3),
       PricePackage(name: 'Sesión de grabación', price: 90, hours: 2),
@@ -448,7 +446,6 @@ List<Artist> _mockArtists() => [
     reviews: 54,
     color: const Color(0xFFE91E63),
     eventTypes: {EventType.cumpleanos, EventType.actividad},
-    depositPercent: 25,
     packages: [
       PricePackage(
         name: 'Show de 1 hora',

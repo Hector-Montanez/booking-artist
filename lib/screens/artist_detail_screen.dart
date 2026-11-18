@@ -212,7 +212,7 @@ class ArtistDetailScreen extends StatelessWidget {
                       subtitle: Text(
                         [
                           '${_hours(p.hours)} de presentación · '
-                              '${p.takesDeposit ? 'Actividad (depósito ${artist.depositPercent}%)' : 'Restaurante (sin depósito)'}',
+                              '${p.paidInApp ? 'Actividad (pago por la app)' : 'Restaurante (pago directo al artista)'}',
                           if (p.description.isNotEmpty) p.description,
                         ].join('\n'),
                       ),
@@ -250,11 +250,12 @@ class ArtistDetailScreen extends StatelessWidget {
                 const _SectionTitle('Condiciones'),
                 Text(
                   [
-                    if (artist.takesDeposits)
-                      'Paquetes de actividades: depósito de '
-                          '${artist.depositPercent}% del total para reservar.',
-                    if (artist.packages.any((p) => !p.takesDeposit))
-                      'Paquetes de restaurante: sin depósito, solo la reserva.',
+                    if (artist.packages.any((p) => p.paidInApp))
+                      'Paquetes de actividades: se paga el total por la app '
+                          'al reservar.',
+                    if (artist.packages.any((p) => !p.paidInApp))
+                      'Paquetes de restaurante: solo la reserva; el pago se '
+                          'arregla directo con el artista.',
                     artist.conditions,
                   ].join(' '),
                 ),
@@ -356,7 +357,9 @@ class ArtistDetailScreen extends StatelessWidget {
           ),
         ],
       ),
-      bottomNavigationBar: preview
+      // Los artistas ven las páginas de otros artistas, pero no reservan.
+      bottomNavigationBar:
+          preview || AppScope.of(context).account?.role == UserRole.artista
           ? null
           : SafeArea(
               child: Padding(
@@ -405,6 +408,9 @@ class ArtistDetailScreen extends StatelessWidget {
   }
 
   void _book(BuildContext context, PricePackage? p) {
+    if (preview || AppScope.of(context).account?.role == UserRole.artista) {
+      return;
+    }
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => BookingScreen(artist: artist, initialPackage: p),

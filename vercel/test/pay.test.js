@@ -53,7 +53,7 @@ const call = (body, uid = 'client1') => new Promise((resolve) => {
 });
 const assert = require('assert');
 (async () => {
-  store['artists/art1'] = { name: 'Sofía', depositPercent: 30, packages: [{ name: 'Básico', price: 175 }] };
+  store['artists/art1'] = { name: 'Sofía', packages: [{ name: 'Básico', price: 175 }] };
   store['subscriptions/art1'] = { status: 'active', trialEnd: 0, paidUntil: Date.now() + 86400000 };
   const mk = (id, payDeposit = true) => { store[`bookings/${id}`] = { clientUid: 'client1', artistId: 'art1', package: 'Básico', payDeposit, status: 'pendiente', payment: 'porPagar', total: 1, amountCharged: 1 }; store[`busy/${id}`] = {}; };
 
@@ -62,8 +62,10 @@ const assert = require('assert');
   let r = await call({ action: 'start', bookingId: 'b1', method: 'tarjeta' });
   assert.equal(r.url, 'https://checkout.stripe.com/x');
   assert.equal(store['bookings/b1'].total, 192.5);
-  assert.equal(store['bookings/b1'].amountCharged, 58);
-  assert.equal(global.lastAmount, '5800');
+  // Sin depósito: aunque una reserva vieja pida depósito, se cobra el total.
+  assert.equal(store['bookings/b1'].amountCharged, 192.5);
+  assert.equal(store['bookings/b1'].payDeposit, false);
+  assert.equal(global.lastAmount, '19250');
   assert.equal((await call({ action: 'accept', bookingId: 'b1' }, 'art1')).code, 409, 'no aceptar sin pago');
   r = await call({ action: 'status', bookingId: 'b1' });
   assert.equal(r.payment, 'retenido');
@@ -116,7 +118,7 @@ const assert = require('assert');
   r = await call({ action: 'start', bookingId: 'b5', method: 'ath', phone: '7875550101' });
   assert.equal(r.code, 400);
 
-  // Paquete de restaurante: sin depósito, no se cobra nada.
+  // Paquete de restaurante: no se cobra nada por la app.
   store['artists/art1'].packages.push({ name: 'Cena', price: 180, kind: 'restaurante' });
   mk('b6'); store['bookings/b6'].package = 'Cena';
   r = await call({ action: 'start', bookingId: 'b6', method: 'ninguno' });
@@ -131,7 +133,7 @@ const assert = require('assert');
   r = await call({ action: 'reject', bookingId: 'b7' }, 'art1');
   assert.equal(r.payment, 'sinPago');
 
-  // Un paquete de actividad no se puede reservar sin depósito.
+  // Un paquete de actividad no se puede reservar sin pagar.
   mk('b8');
   r = await call({ action: 'start', bookingId: 'b8', method: 'ninguno' });
   assert.equal(r.code, 400);

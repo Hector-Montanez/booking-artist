@@ -9,7 +9,11 @@ import 'artist_detail_screen.dart';
 enum SortBy { distancia, precio, valoracion }
 
 class ExploreScreen extends StatefulWidget {
-  const ExploreScreen({super.key});
+  const ExploreScreen({super.key, this.forArtist = false});
+
+  /// Lo abre un artista: ve la misma lista que los clientes, para buscarse y
+  /// comprobar que su página está saliendo.
+  final bool forArtist;
 
   @override
   State<ExploreScreen> createState() => _ExploreScreenState();
@@ -25,6 +29,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
   @override
   Widget build(BuildContext context) {
     final state = AppScope.of(context);
+    final me = widget.forArtist ? state.myArtistProfile : null;
+    final title = me == null
+        ? '¿A quién quieres contratar?'
+        : 'Artistas en Tarima';
     final q = _query.toLowerCase();
     final list =
         state.artists.where((a) {
@@ -89,14 +97,18 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   const SizedBox(height: 8),
                   if (isFuturista(context))
                     NeonText(
-                      '¿A quién quieres contratar?',
+                      title,
                       style: Theme.of(context).textTheme.headlineSmall,
                     )
                   else
                     Text(
-                      '¿A quién quieres contratar?',
+                      title,
                       style: Theme.of(context).textTheme.headlineSmall,
                     ),
+                  if (me != null) ...[
+                    const SizedBox(height: 12),
+                    MyListingStatus(artist: me),
+                  ],
                   const SizedBox(height: 12),
                   SearchBar(
                     hintText: 'Busca por nombre, género o instrumento',
@@ -171,7 +183,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     children: [
                       Expanded(
                         child: Text(
-                          '${list.length} artistas cerca de ti',
+                          me == null
+                              ? '${list.length} artistas cerca de ti'
+                              : '${list.length} artistas en la app',
                           style: Theme.of(context).textTheme.titleMedium,
                         ),
                       ),
@@ -210,9 +224,60 @@ class _ExploreScreenState extends State<ExploreScreen> {
             sliver: SliverList.separated(
               itemCount: list.length,
               separatorBuilder: (_, _) => const SizedBox(height: 12),
-              itemBuilder: (_, i) => ArtistCard(artist: list[i]),
+              itemBuilder: (_, i) => list[i] == me
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Padding(
+                          padding: EdgeInsets.only(bottom: 4),
+                          child: Chip(
+                            avatar: Icon(Icons.person_pin, size: 18),
+                            label: Text('Este eres tú'),
+                            visualDensity: VisualDensity.compact,
+                          ),
+                        ),
+                        ArtistCard(artist: list[i]),
+                      ],
+                    )
+                  : ArtistCard(artist: list[i]),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Le dice al artista si su página sale en la lista que ven los clientes, y
+/// qué le falta si no sale.
+class MyListingStatus extends StatelessWidget {
+  const MyListingStatus({super.key, required this.artist});
+
+  final Artist artist;
+
+  @override
+  Widget build(BuildContext context) {
+    final listed = artist.listed;
+    final color = listed ? const Color(0xFF2E7D32) : const Color(0xFFC62828);
+    final text = listed
+        ? 'Estás apareciendo en la app. Los clientes te encuentran aquí '
+              'mientras tu membresía esté activa.'
+        : artist.packages.isEmpty
+        ? 'Todavía no apareces: añade al menos un precio en Solicitudes.'
+        : 'No apareces en la app porque tu membresía no está activa. '
+              'Actívala en Solicitudes para que los clientes te vean.';
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withValues(alpha: 0.6)),
+      ),
+      child: Row(
+        children: [
+          Icon(listed ? Icons.visibility : Icons.visibility_off, color: color),
+          const SizedBox(width: 10),
+          Expanded(child: Text(text)),
         ],
       ),
     );

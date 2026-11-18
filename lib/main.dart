@@ -5,6 +5,7 @@ import 'app_state.dart';
 import 'cloud.dart';
 import 'models.dart';
 import 'screens/account_screen.dart';
+import 'screens/artist_calendar_screen.dart';
 import 'screens/artist_panel_screen.dart';
 import 'screens/edit_page_screen.dart';
 import 'screens/explore_screen.dart';
@@ -108,9 +109,10 @@ class _ShellState extends State<_Shell> {
     final pages = widget.artist
         ? const [
             ArtistPanelScreen(),
+            ArtistCalendarScreen(),
+            ExploreScreen(forArtist: true),
             InboxScreen(),
             EditPageScreen(),
-            AccountScreen(),
           ]
         : const [
             ExploreScreen(),
@@ -120,15 +122,21 @@ class _ShellState extends State<_Shell> {
           ];
     final destinations = widget.artist
         ? [
+            // Mi cuenta se abre con el botón de la persona arriba a la
+            // derecha del panel y de Mi página.
             NavigationDestination(icon: badge, label: 'Solicitudes'),
+            const NavigationDestination(
+              icon: Icon(Icons.calendar_month),
+              label: 'Calendario',
+            ),
+            const NavigationDestination(
+              icon: Icon(Icons.search),
+              label: 'Explorar',
+            ),
             inbox,
             const NavigationDestination(
               icon: Icon(Icons.brush),
               label: 'Mi página',
-            ),
-            const NavigationDestination(
-              icon: Icon(Icons.person),
-              label: 'Mi cuenta',
             ),
           ]
         : [

@@ -206,3 +206,18 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
     );
   }
 }
+
+/// Botón de la barra de arriba que abre Mi cuenta (los artistas no tienen
+/// pestaña de cuenta).
+class AccountButton extends StatelessWidget {
+  const AccountButton({super.key});
+
+  @override
+  Widget build(BuildContext context) => IconButton(
+    tooltip: 'Mi cuenta',
+    icon: const Icon(Icons.account_circle),
+    onPressed: () =>
+        Navigator.of(context)
+            .push(MaterialPageRoute(builder: (_) => const AccountScreen())),
+  );
+}

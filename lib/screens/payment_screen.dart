@@ -144,8 +144,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
                       _athAllowed
                           ? 'Confirmas el pago en la app de ATH Móvil.'
                           : 'ATH Móvil acepta pagos de hasta '
-                                '${money(_config?.athMax ?? 1500)}. Escoge '
-                                'depósito o paga con tarjeta.',
+                                '${money(_config?.athMax ?? 1500)}. Paga con '
+                                'tarjeta.',
                       enabled: _athAllowed,
                     ),
                   ],

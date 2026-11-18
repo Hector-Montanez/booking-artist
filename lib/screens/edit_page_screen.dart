@@ -8,6 +8,7 @@ import '../models.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/pickers.dart';
+import 'account_screen.dart';
 import 'artist_detail_screen.dart';
 
 /// Colores que el artista puede escoger para su página.
@@ -90,6 +91,7 @@ class _EditPageScreenState extends State<EditPageScreen> {
               ),
             ),
           ),
+          const AccountButton(),
         ],
       ),
       body: ListView(
@@ -261,19 +263,11 @@ class _EditPageScreenState extends State<EditPageScreen> {
           const SizedBox(height: 24),
           Text('Condiciones de reserva', style: theme.textTheme.titleMedium),
           const SizedBox(height: 4),
-          Text(
-            'Depósito para reservar: ${_me.depositPercent}% del total. Solo '
-            'se pide en los paquetes de actividades; los de restaurante no '
-            'llevan depósito.',
+          const Text(
+            'Los paquetes de actividades se pagan completos por la app al '
+            'reservar; los de restaurante se pagan directo contigo.',
           ),
-          Slider(
-            value: _me.depositPercent.toDouble(),
-            min: 10,
-            max: 100,
-            divisions: 9,
-            label: '${_me.depositPercent}%',
-            onChanged: (v) => _update(() => _me.depositPercent = v.round()),
-          ),
+          const SizedBox(height: 8),
           TextField(
             controller: _conditions,
             maxLines: 4,
