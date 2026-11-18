@@ -5,6 +5,7 @@ import '../app_state.dart';
 import '../models.dart';
 import '../widgets/common.dart';
 import '../widgets/subscription_card.dart';
+import 'account_screen.dart';
 import 'availability_screen.dart';
 import 'inbox_screen.dart';
 
@@ -22,7 +23,10 @@ class ArtistPanelScreen extends StatelessWidget {
         .toList();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Panel de artista')),
+      appBar: AppBar(
+        title: const Text('Panel de artista'),
+        actions: const [AccountButton()],
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -73,7 +77,6 @@ class ArtistPanelScreen extends StatelessWidget {
                 title: Text(p.name),
                 subtitle: Text(
                   '${p.kind.label} · '
-                  '${p.takesDeposit ? 'depósito ${me.depositPercent}%' : 'sin depósito'} · '
                   '${p.hours} h${p.description.isEmpty ? '' : ' · ${p.description}'}',
                 ),
                 trailing: Text(
@@ -202,11 +205,7 @@ class ArtistPanelScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  kind == PackageKind.actividad
-                      ? 'Bodas, cumpleaños, actividades. El cliente deja un '
-                            'depósito del ${me.depositPercent}% (lo cambias en '
-                            'Mi página).'
-                      : kind.description,
+                  kind.description,
                   style: Theme.of(ctx).textTheme.bodySmall,
                   textAlign: TextAlign.center,
                 ),
@@ -399,8 +398,7 @@ class _RequestCard extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               b.noDeposit
-                  ? 'Restaurante, sin depósito: ${money(b.total)} a pagar '
-                        'directo al artista'
+                  ? '${money(b.total)} a pagar directo al artista'
                   : '${b.payDeposit ? 'Depósito' : 'Pago completo'} '
                         '(${b.paidWith}): '
                         '${money(b.amountCharged)} de ${money(b.total)} · '

@@ -731,7 +731,6 @@ Map<String, dynamic> artistToMap(Artist a) {
     'color': a.color.toARGB32(),
     'tagline': a.tagline,
     'instruments': a.instruments,
-    'depositPercent': a.depositPercent,
     'conditions': a.conditions,
     'email': a.email.toLowerCase(),
     if (a.createdAt != null) 'createdAt': a.createdAt!.millisecondsSinceEpoch,
@@ -796,7 +795,6 @@ void applyArtistMap(Artist a, Map<String, dynamic> d) {
     ..color = Color((d['color'] as num?)?.toInt() ?? 0xFF6A1B9A)
     ..tagline = d['tagline'] ?? ''
     ..instruments = strings(d['instruments'])
-    ..depositPercent = (d['depositPercent'] as num?)?.toInt() ?? 30
     ..conditions = d['conditions'] ?? defaultConditions
     ..email = d['email'] ?? a.email
     ..bufferMinutes = (d['bufferMinutes'] as num?)?.toInt() ?? 60

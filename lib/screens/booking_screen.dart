@@ -26,7 +26,6 @@ class _BookingScreenState extends State<BookingScreen> {
   DateTime? _date;
   TimeOfDay? _time;
   bool _accepted = false;
-  bool _payDeposit = true;
   bool _sending = false;
 
   // Se llenan con los datos de la cuenta; el cliente puede cambiarlos.
@@ -51,19 +50,23 @@ class _BookingScreenState extends State<BookingScreen> {
   PricePackage _defaultPackage() {
     final packages = widget.artist.packages;
     if (AppScope.of(context).account?.clientType == ClientType.restaurante) {
-      return packages.where((p) => !p.takesDeposit).firstOrNull ??
+      return packages
+              .where((p) => p.kind == PackageKind.restaurante)
+              .firstOrNull ??
           packages.first;
     }
     return packages.first;
   }
 
-  /// Paquete de restaurante: sin depósito, solo la reserva.
-  bool get _noDeposit => !_package.takesDeposit;
+  /// No se paga por la app, solo la reserva (todas en el MVP).
+  bool get _noDeposit => !_package.paidInApp;
 
   /// Tipos de evento que van con el paquete: los de restaurante son para
   /// restaurantes; los de actividades, para todo lo demás.
   List<EventType> get _eventTypes {
-    if (_noDeposit) return const [EventType.restaurante];
+    if (_package.kind == PackageKind.restaurante) {
+      return const [EventType.restaurante];
+    }
     final types = widget.artist.eventTypes
         .where((e) => e != EventType.restaurante)
         .toList();
@@ -93,14 +96,14 @@ class _BookingScreenState extends State<BookingScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final artist = widget.artist;
-    // Sin depósito no se cobra nada por la app, ni la tarifa de servicio.
+    // Restaurante: no se cobra nada por la app, ni la tarifa de servicio.
+    // Actividades: se paga el total al reservar (no hay depósito).
     final noDeposit = _noDeposit;
     final total = noDeposit
         ? _package.price
         : ((_package.price * (1 + _feeRate)) * 100).round() / 100;
     final fee = total - _package.price;
-    final deposit = (total * artist.depositPercent / 100).roundToDouble();
-    final dueNow = noDeposit ? 0.0 : (_payDeposit ? deposit : total);
+    final dueNow = noDeposit ? 0.0 : total;
     final dateFmt = DateFormat.yMMMMEEEEd('es');
 
     return Scaffold(
@@ -129,9 +132,7 @@ class _BookingScreenState extends State<BookingScreen> {
                     RadioListTile<PricePackage>(
                       value: p,
                       title: Text(p.name),
-                      subtitle: Text(
-                        '${p.hours} h · ${p.takesDeposit ? 'Actividad, con depósito' : 'Restaurante, sin depósito'}',
-                      ),
+                      subtitle: Text('${p.hours} h · ${p.kind.label}'),
                       secondary: Text(
                         money(p.price),
                         style: const TextStyle(fontWeight: FontWeight.bold),
@@ -229,16 +230,7 @@ class _BookingScreenState extends State<BookingScreen> {
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      noDeposit
-                          ? 'Paquete de restaurante: sin depósito'
-                          : 'Depósito para reservar: ${artist.depositPercent}%',
-                      style: theme.textTheme.titleSmall,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(artist.conditions),
-                  ],
+                  children: [Text(artist.conditions)],
                 ),
               ),
             ),
@@ -250,7 +242,7 @@ class _BookingScreenState extends State<BookingScreen> {
               title: const Text('Acepto las condiciones del artista'),
             ),
             if (noDeposit) ...[
-              _StepTitle(4, 'Sin depósito'),
+              _StepTitle(4, 'Sin pago por la app'),
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -265,40 +257,12 @@ class _BookingScreenState extends State<BookingScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Los paquetes de restaurante no llevan depósito: solo reservas '
-                'la fecha. El pago se arregla directo con ${artist.name}.',
+                'No pagas nada por la app: reservas la fecha y el pago se '
+                'arregla directo con ${artist.name}.',
                 style: theme.textTheme.bodySmall,
               ),
             ] else ...[
-              _StepTitle(4, '¿Cuánto pagas ahora?'),
-              RadioGroup<bool>(
-                groupValue: _payDeposit,
-                onChanged: (v) => setState(() => _payDeposit = v!),
-                child: Column(
-                  children: [
-                    RadioListTile<bool>(
-                      value: true,
-                      title: Text('Depósito del ${artist.depositPercent}%'),
-                      subtitle: Text(
-                        'El resto (${money(total - deposit)}) se paga por la app '
-                        'el día del evento.',
-                      ),
-                      secondary: Text(
-                        money(deposit),
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                    RadioListTile<bool>(
-                      value: false,
-                      title: const Text('Pago completo'),
-                      secondary: Text(
-                        money(total),
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              _StepTitle(4, 'Pago'),
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -309,7 +273,6 @@ class _BookingScreenState extends State<BookingScreen> {
                         'Tarifa de servicio (${(_feeRate * 100).round()}%)',
                         money(fee),
                       ),
-                      _row('Total del evento', money(total)),
                       const Divider(),
                       _row('A pagar ahora', money(dueNow), bold: true),
                     ],
@@ -437,14 +400,14 @@ class _BookingScreenState extends State<BookingScreen> {
       notes: _notes.text.trim(),
       total: total,
       amountCharged: dueNow,
-      payDeposit: !_noDeposit && _payDeposit,
+      payDeposit: false,
       noDeposit: _noDeposit,
       paymentMethod: _noDeposit ? PaymentMethod.ninguno : PaymentMethod.tarjeta,
       cardLast4: '',
     );
 
     if (_noDeposit) {
-      // Paquete de restaurante: no hay pago, solo la solicitud.
+      // Sin pago por la app: solo la solicitud.
       String? error;
       if (state.serverPayments) {
         setState(() => _sending = true);
@@ -506,7 +469,7 @@ Future<void> showPaidDialog(BuildContext context, Booking b) {
   final amount = money(b.amountCharged);
   final name = b.artist.name;
   final how = b.noDeposit
-      ? 'No pagaste nada: es un paquete de restaurante, sin depósito. El pago '
+      ? 'No pagaste nada por la app. El pago '
             'se arregla directo con $name.'
       : b.paymentMethod == PaymentMethod.ath
       ? 'Pagaste $amount con ATH Móvil. Si $name no acepta, te devolvemos el '

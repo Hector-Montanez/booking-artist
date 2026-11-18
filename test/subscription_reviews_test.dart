@@ -95,35 +95,42 @@ void main() {
     },
   );
 
-  testWidgets('un paquete de restaurante se reserva sin depósito', (
-    tester,
-  ) async {
-    tester.view.physicalSize = const Size(800, 2400);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.reset);
-    final state = AppState();
-    await state.login(AppState.demoClientEmail, AppState.demoPassword);
-    final sofia = state.artists.firstWhere((a) => a.id == 'a1');
-    final cena = sofia.packages.firstWhere((p) => !p.takesDeposit);
-    final boda = sofia.packages.firstWhere((p) => p.takesDeposit);
+  testWidgets(
+    'un paquete de restaurante se reserva sin pagar y no hay depósito',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final state = AppState();
+      await state.login(AppState.demoClientEmail, AppState.demoPassword);
+      final sofia = state.artists.firstWhere((a) => a.id == 'a1');
+      final cena = sofia.packages.firstWhere(
+        (p) => p.kind == PackageKind.restaurante,
+      );
+      final boda = sofia.packages.firstWhere(
+        (p) => p.kind == PackageKind.actividad,
+      );
 
-    await tester.pumpWidget(
-      AppScope(
-        state: state,
-        child: MaterialApp(
-          home: BookingScreen(artist: sofia, initialPackage: cena),
+      await tester.pumpWidget(
+        AppScope(
+          state: state,
+          child: MaterialApp(
+            home: BookingScreen(artist: sofia, initialPackage: cena),
+          ),
         ),
-      ),
-    );
-    expect(find.text('Enviar solicitud'), findsOneWidget);
-    expect(find.text('Paquete de restaurante: sin depósito'), findsOneWidget);
-    expect(find.textContaining('Depósito del'), findsNothing);
+      );
+      expect(find.text('Enviar solicitud'), findsOneWidget);
+      expect(find.text('Sin pago por la app'), findsOneWidget);
+      expect(find.textContaining('Depósito'), findsNothing);
 
-    await tester.tap(find.text(boda.name));
-    await tester.pumpAndSettle();
-    expect(find.textContaining('Continuar al pago'), findsOneWidget);
-    expect(find.textContaining('Depósito del'), findsOneWidget);
-  });
+      await tester.tap(find.text(boda.name));
+      await tester.pumpAndSettle();
+      // MVP: las actividades tampoco se pagan por la app.
+      expect(find.text('Enviar solicitud'), findsOneWidget);
+      expect(find.textContaining('Continuar al pago'), findsNothing);
+      expect(find.textContaining('Depósito'), findsNothing);
+    },
+  );
 
   testWidgets('las pantallas nuevas caben en un teléfono', (tester) async {
     tester.view.physicalSize = const Size(390, 844);
@@ -163,6 +170,7 @@ void main() {
     final sofia = state.artists.firstWhere((a) => a.id == 'a1');
     await show(ArtistDetailScreen(artist: sofia));
     await tester.scrollUntilVisible(find.text('Reseñas'), 300);
+    await tester.scrollUntilVisible(find.text('Restaurante El Patio'), 200);
     expect(find.text('Restaurante El Patio'), findsWidgets);
   });
 }

@@ -77,8 +77,15 @@ extension EventTypeInfo on EventType {
   };
 }
 
-/// Para qué es un paquete. Los de actividades piden depósito; los de
-/// restaurante son solo la reserva, sin pagar nada por la app.
+/// Pagos de reservas por la app. En el MVP están apagados: el cliente solo
+/// reserva la fecha y le paga directo al artista. Tarima solo cobra la
+/// membresía del artista. El servidor (/api/pay) tiene el mismo interruptor
+/// (IN_APP_PAYMENTS en Vercel).
+const inAppPayments = false;
+
+/// Para qué es un paquete: restaurantes o actividades (bodas, cumpleaños…).
+/// Si se encienden los pagos, los de actividades se pagan por la app; los de
+/// restaurante siempre son solo la reserva.
 enum PackageKind { actividad, restaurante }
 
 extension PackageKindInfo on PackageKind {
@@ -88,10 +95,8 @@ extension PackageKindInfo on PackageKind {
   };
 
   String get description => switch (this) {
-    PackageKind.actividad =>
-      'Bodas, cumpleaños, actividades. El cliente deja un depósito.',
-    PackageKind.restaurante =>
-      'Sin depósito: el cliente solo reserva la fecha.',
+    PackageKind.actividad => 'Bodas, cumpleaños y actividades.',
+    PackageKind.restaurante => 'Para restaurantes y negocios.',
   };
 
   IconData get icon => switch (this) {
@@ -116,8 +121,9 @@ class PricePackage {
   String description;
   PackageKind kind;
 
-  /// Solo los paquetes de actividades piden depósito al reservar.
-  bool get takesDeposit => kind == PackageKind.actividad;
+  /// Se paga por la app al reservar (solo actividades, y solo con los pagos
+  /// encendidos).
+  bool get paidInApp => inAppPayments && kind == PackageKind.actividad;
 }
 
 /// Reseña que deja un cliente después de un evento confirmado. Una por
@@ -260,7 +266,6 @@ class Artist {
     this.demoNote,
     this.tagline = '',
     List<String>? instruments,
-    this.depositPercent = 30,
     this.conditions = defaultConditions,
     this.email = '',
     Map<int, DayHours>? weeklyHours,
@@ -322,8 +327,6 @@ class Artist {
   /// mes gratis.
   bool get listed => packages.isNotEmpty && effectiveSubscription.visible;
 
-  /// Pide depósito en al menos uno de sus paquetes.
-  bool get takesDeposits => packages.any((p) => p.takesDeposit);
   Color color;
   final List<PricePackage> packages;
   final List<MediaLink> links;
@@ -341,9 +344,6 @@ class Artist {
 
   /// Instrumentos que toca (solistas y músicos independientes).
   List<String> instruments;
-
-  /// Porcentaje del total que el cliente paga como depósito al reservar.
-  int depositPercent;
 
   /// Condiciones que el cliente acepta antes de pagar.
   String conditions;
@@ -414,7 +414,7 @@ Map<int, DayHours> defaultWeeklyHours() => {
 
 const defaultConditions =
     'Cancelación gratis hasta 7 días antes del evento. '
-    'Después de eso el depósito no se devuelve. '
+    'Después de eso el pago no se devuelve. '
     'El cliente provee electricidad y un espacio techado para tocar.';
 
 enum BookingStatus { pendiente, confirmada, rechazada, cancelada }
@@ -467,7 +467,7 @@ extension PaymentStatusInfo on PaymentStatus {
     PaymentStatus.liberado => 'No se cobró nada',
     PaymentStatus.reembolsado => 'Reembolsado',
     PaymentStatus.simulado => 'Pago de prueba (no se cobró)',
-    PaymentStatus.sinPago => 'Sin depósito: solo reserva',
+    PaymentStatus.sinPago => 'Sin pago por la app: solo reserva',
   };
 }
 
@@ -527,11 +527,12 @@ class Booking {
   final String clientUid;
   BookingStatus status;
 
-  /// Lo que se cobra al reservar: el depósito o el total.
+  /// Lo que se cobra al reservar (el total; ya no hay depósito). Las
+  /// reservas viejas pueden tener payDeposit en true.
   double amountCharged;
   final bool payDeposit;
 
-  /// Paquete de restaurante: se reservó sin depósito y sin pagar por la app;
+  /// Se reservó sin pagar nada por la app;
   /// el pago se arregla directo con el artista.
   final bool noDeposit;
 
@@ -547,7 +548,7 @@ class Booking {
     PaymentMethod.ath =>
       cardLast4.isEmpty ? 'ATH Móvil' : 'ATH Móvil (tel. •••• $cardLast4)',
     PaymentMethod.prueba => 'Pago de prueba',
-    PaymentMethod.ninguno => 'Sin depósito',
+    PaymentMethod.ninguno => 'Pago directo al artista',
   };
 
   /// Duración del paquete reservado.

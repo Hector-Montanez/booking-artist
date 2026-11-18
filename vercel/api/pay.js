@@ -22,6 +22,10 @@ const admin = require('firebase-admin');
 const subscription = require('./subscribe.js');
 
 const FEE_RATE = Number(process.env.FEE_RATE || 0.1);
+// MVP: las reservas no se pagan por la app (solo se reserva la fecha y el
+// cliente le paga directo al artista). Para encender los pagos de actividades,
+// poner IN_APP_PAYMENTS=on en Vercel y `inAppPayments = true` en la app.
+const inAppPayments = () => process.env.IN_APP_PAYMENTS === 'on';
 const ATHM_URL = 'https://payments.athmovil.com/api/business-transaction/ecommerce';
 const ATHM_MAX = 1500; // Límite de ATH Móvil por pago.
 
@@ -58,17 +62,17 @@ const round2 = (n) => Math.round(n * 100) / 100;
 
 /**
  * Mismo cálculo que la app (booking_screen.dart), hecho con los datos del servidor.
- * Los paquetes de restaurante no llevan depósito ni tarifa: solo se reserva.
+ * Sin pagos por la app (MVP), o en paquetes de restaurante, no se cobra nada
+ * ni hay tarifa: solo se reserva. Con pagos, las actividades se pagan
+ * completas (no hay depósito).
  */
-function amounts(artist, packageName, payDeposit) {
+function amounts(artist, packageName) {
   const pkg = (artist.packages || []).find((p) => p.name === packageName);
   if (!pkg) throw new Fail(400, 'El paquete ya no existe');
   const price = Number(pkg.price);
-  if (pkg.kind === 'restaurante') return { price, fee: 0, total: price, dueNow: 0, noDeposit: true };
+  if (pkg.kind === 'restaurante' || !inAppPayments()) return { price, fee: 0, total: price, dueNow: 0, noDeposit: true };
   const total = round2(price * (1 + FEE_RATE));
-  const pct = Number(artist.depositPercent ?? 30);
-  const deposit = Math.round((total * pct) / 100);
-  return { price, fee: round2(total - price), total, dueNow: payDeposit ? deposit : total };
+  return { price, fee: round2(total - price), total, dueNow: total };
 }
 
 // ---------- Stripe ----------
@@ -147,16 +151,16 @@ async function start(req, db, caller, body) {
   let sub = (await db.collection('subscriptions').doc(b.artistId).get()).data();
   if (!sub) sub = { trialEnd: await subscription.trialEndFor(db, b.artistId) };
   if (!subscription.visible(sub)) throw new Fail(409, 'Este artista no está recibiendo reservas ahora');
-  const m = amounts(artist, b.package, b.payDeposit !== false);
+  const m = amounts(artist, b.package);
   const concept = `${b.package} · ${artist.name}`.slice(0, 80);
-  const common = { total: m.total, amountCharged: m.dueNow, fee: m.fee };
+  const common = { total: m.total, amountCharged: m.dueNow, fee: m.fee, payDeposit: false };
 
   // Paquete de restaurante: no se cobra nada, la reserva pasa directo al artista.
   if (m.noDeposit) {
     await ref.update({ ...common, noDeposit: true, payDeposit: false, paymentMethod: 'ninguno', cardLast4: '', payment: 'sinPago' });
     return { payment: 'sinPago', amount: 0 };
   }
-  if (body.method === 'ninguno') throw new Fail(400, 'Este paquete pide depósito para reservar');
+  if (body.method === 'ninguno') throw new Fail(400, 'Este paquete se paga por la app para reservar');
 
   let method = body.method;
   if ((method === 'tarjeta' && !has.card()) || (method === 'ath' && !has.ath())) method = 'prueba';
@@ -187,7 +191,7 @@ async function start(req, db, caller, body) {
             unit_amount: Math.round(m.dueNow * 100),
             product_data: {
               name: concept,
-              description: b.payDeposit !== false ? 'Depósito de la reserva' : 'Pago completo de la reserva',
+              description: 'Pago completo de la reserva',
             },
           },
         },
@@ -224,7 +228,7 @@ async function start(req, db, caller, body) {
       tax: '0',
       metadata1: `Reserva ${ref.id}`.slice(0, 40),
       metadata2: artist.name.slice(0, 40),
-      items: [{ name: concept.slice(0, 40), description: b.payDeposit !== false ? 'Deposito' : 'Pago completo', quantity: '1', price, tax: '0', metadata: ref.id.slice(0, 40) }],
+      items: [{ name: concept.slice(0, 40), description: 'Pago completo', quantity: '1', price, tax: '0', metadata: ref.id.slice(0, 40) }],
       phoneNumber: phone,
     });
     await secretRef.set(
