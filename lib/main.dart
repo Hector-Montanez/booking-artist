@@ -131,6 +131,7 @@ class _ShellState extends State<_Shell> {
         : const [
             ExploreScreen(),
             MyBookingsScreen(),
+            ArtistCalendarScreen(forClient: true),
             InboxScreen(),
             AccountScreen(),
           ];
@@ -159,6 +160,10 @@ class _ShellState extends State<_Shell> {
               label: 'Explorar',
             ),
             NavigationDestination(icon: badge, label: 'Reservas'),
+            const NavigationDestination(
+              icon: Icon(Icons.calendar_month),
+              label: 'Calendario',
+            ),
             inbox,
             const NavigationDestination(
               icon: Icon(Icons.person),

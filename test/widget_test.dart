@@ -155,4 +155,53 @@ void main() {
     expect(state.account?.town, 'Bayamón');
     expect(find.text('En Bayamón'), findsOneWidget);
   });
+
+  testWidgets('El cliente ve sus actividades en Calendario', (tester) async {
+    tester.view.physicalSize = const Size(1080, 4000);
+    tester.view.devicePixelRatio = 2.5;
+    addTearDown(tester.view.reset);
+    final state = AppState();
+    await tester.pumpWidget(
+      AppScope(state: state, child: const BookingArtistApp()),
+    );
+    final client = state.findAccount(
+      AppState.demoClientEmail,
+      AppState.demoPassword,
+    )!;
+    final sofia = state.artists.firstWhere((a) => a.id == 'a1');
+    final today = DateTime.now();
+    state.bookings.add(
+      Booking(
+        id: 'hoy',
+        artist: sofia,
+        package: sofia.packages.first.name,
+        eventType: EventType.restaurante,
+        date: DateTime(today.year, today.month, today.day),
+        time: const TimeOfDay(hour: 23, minute: 0),
+        venue: 'Restaurante El Patio',
+        clientName: 'Restaurante El Patio',
+        clientType: ClientType.restaurante,
+        clientEmail: AppState.demoClientEmail,
+        notes: '',
+        total: sofia.packages.first.price,
+        amountCharged: 0,
+        payDeposit: false,
+        noDeposit: true,
+        cardLast4: '',
+        status: BookingStatus.confirmada,
+        payment: PaymentStatus.sinPago,
+        paymentMethod: PaymentMethod.ninguno,
+        hours: 1,
+      ),
+    );
+    state.signIn(client);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Calendario'));
+    await tester.pumpAndSettle();
+    expect(find.text('Mi calendario'), findsOneWidget);
+    // Ve el artista que contrató, no su propio nombre.
+    expect(find.text('Sofía Rivera · Restaurante'), findsOneWidget);
+    expect(find.text('Día libre'), findsNothing);
+  });
 }

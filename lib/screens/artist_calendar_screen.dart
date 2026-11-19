@@ -9,8 +9,13 @@ import '../widgets/common.dart';
 /// Calendario del artista: cada día con actividades lleva puntos de color
 /// (verde confirmada, amarillo esperando respuesta). Al tocar un día se ven
 /// sus actividades abajo.
+///
+/// El cliente (quien contrata) ve el mismo calendario con las actividades que
+/// reservó.
 class ArtistCalendarScreen extends StatefulWidget {
-  const ArtistCalendarScreen({super.key});
+  const ArtistCalendarScreen({super.key, this.forClient = false});
+
+  final bool forClient;
 
   @override
   State<ArtistCalendarScreen> createState() => _ArtistCalendarScreenState();
@@ -32,14 +37,16 @@ class _ArtistCalendarScreenState extends State<ArtistCalendarScreen> {
   @override
   Widget build(BuildContext context) {
     final state = AppScope.of(context);
-    final me = state.myArtistProfile;
+    final client = widget.forClient;
+    final me = client ? null : state.myArtistProfile;
+    final daysOff = me?.daysOff ?? const <DateTime>{};
     final theme = Theme.of(context);
 
     // Solo las actividades vivas: las rechazadas, canceladas o sin pagar no
     // ocupan el calendario.
     final byDay = <DateTime, List<Booking>>{};
-    for (final b in state.bookings) {
-      if (b.artist != me || !b.blocksSchedule) continue;
+    for (final b in client ? state.myClientBookings : state.bookings) {
+      if ((!client && b.artist != me) || !b.blocksSchedule) continue;
       if (b.payment == PaymentStatus.porPagar) continue;
       byDay.putIfAbsent(dayOnly(b.date), () => []).add(b);
     }
@@ -100,18 +107,26 @@ class _ArtistCalendarScreenState extends State<ArtistCalendarScreen> {
             month: _month,
             selected: _selected,
             byDay: byDay,
-            daysOff: me.daysOff,
+            daysOff: daysOff,
             onTap: (d) => setState(() => _selected = d),
           ),
           const SizedBox(height: 8),
-          const Wrap(
+          Wrap(
             alignment: WrapAlignment.center,
             spacing: 16,
             runSpacing: 4,
             children: [
-              _Legend(color: Color(0xFF2E7D32), text: 'Confirmada'),
-              _Legend(color: Color(0xFFF9A825), text: 'Esperando respuesta'),
-              _Legend(color: Colors.grey, text: 'Día libre', outline: true),
+              const _Legend(color: Color(0xFF2E7D32), text: 'Confirmada'),
+              const _Legend(
+                color: Color(0xFFF9A825),
+                text: 'Esperando respuesta',
+              ),
+              if (!client)
+                const _Legend(
+                  color: Colors.grey,
+                  text: 'Día libre',
+                  outline: true,
+                ),
             ],
           ),
           const SizedBox(height: 16),
@@ -122,11 +137,11 @@ class _ArtistCalendarScreenState extends State<ArtistCalendarScreen> {
           const SizedBox(height: 8),
           if (dayList.isEmpty)
             Text(
-              me.daysOff.contains(_selected)
+              daysOff.contains(_selected)
                   ? 'Día libre: no recibes reservas este día.'
                   : 'No tienes actividades este día.',
             ),
-          for (final b in dayList) _EventCard(booking: b),
+          for (final b in dayList) _EventCard(booking: b, forClient: client),
         ],
       ),
     );
@@ -332,9 +347,12 @@ class _Legend extends StatelessWidget {
 }
 
 class _EventCard extends StatelessWidget {
-  const _EventCard({required this.booking});
+  const _EventCard({required this.booking, this.forClient = false});
 
   final Booking booking;
+
+  /// El cliente ve el artista que contrató; el artista ve quién lo contrató.
+  final bool forClient;
 
   @override
   Widget build(BuildContext context) {
@@ -371,7 +389,8 @@ class _EventCard extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              '${b.clientName} · ${b.eventType.label}',
+              '${forClient ? b.artist.name : b.clientName} · '
+              '${b.eventType.label}',
               style: const TextStyle(fontWeight: FontWeight.w600),
             ),
             Text(b.package),
