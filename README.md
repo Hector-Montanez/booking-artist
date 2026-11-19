@@ -1,6 +1,6 @@
 # Booking Artist (prototipo)
 
-App móvil (iOS y Android) hecha con Flutter para reservar músicos, agrupaciones, DJs y payasos.
+App móvil (iOS y Android) hecha con Flutter para reservar músicos, agrupaciones, DJs y animadores.
 Para todo Puerto Rico (la primera prueba fue en Caguas). Usa datos de ejemplo: seis artistas ficticios y un perfil de prueba de Kimy-K Acústico (artista real, con su Instagram público; precios de ejemplo).
 
 ## Qué incluye

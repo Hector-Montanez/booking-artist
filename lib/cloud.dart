@@ -11,6 +11,7 @@ import 'package:http/http.dart' as http;
 import 'app_state.dart';
 import 'firebase_options.dart';
 import 'models.dart';
+import 'places.dart' show matchMunicipio;
 
 /// Guarda y sincroniza los datos de la app en Firebase (Auth + Firestore).
 ///
@@ -458,6 +459,13 @@ class Cloud {
   }
 
   /// Guarda el estilo visual que escogió la persona.
+  void saveTown(String value) {
+    _col('users')
+        .doc(uid)
+        .update({'town': value, 'pueblo': value})
+        .catchError(_ignore);
+  }
+
   void saveTheme(String value) {
     _col('users').doc(uid).update({'theme': value}).catchError(_ignore);
   }
@@ -696,23 +704,45 @@ Map<String, dynamic> accountToMap(Account a) => {
   'businessName': a.businessName,
   'address': a.address,
   'town': a.town,
+  if (matchMunicipio(a.town) != null) 'pueblo': a.town,
   'smsOptIn': a.smsOptIn,
   'theme': ?a.theme,
 };
 
-Account accountFromMap(Map<String, dynamic> d, Artist? artist) => Account(
-  role: UserRole.values.byName(d['role']),
-  name: d['name'] ?? '',
-  email: d['email'] ?? '',
-  phone: d['phone'] ?? '',
-  clientType: ClientType.values.byName(d['clientType'] ?? 'privado'),
-  businessName: d['businessName'] ?? '',
-  address: d['address'] ?? '',
-  town: d['town'] ?? 'Caguas',
-  artist: artist,
-  smsOptIn: d['smsOptIn'] == true,
-  theme: d['theme'] as String?,
-);
+Account accountFromMap(Map<String, dynamic> d, Artist? artist) {
+  // 'pueblo' se guarda desde que la app lo pide de una lista. Antes los
+  // clientes escribían el pueblo a mano (se acepta si es uno real) y los
+  // artistas no lo ponían.
+  var town =
+      matchMunicipio(d['pueblo'] as String?) ??
+      (d['role'] == UserRole.cliente.name
+          ? matchMunicipio(d['town'] as String?)
+          : null) ??
+      '';
+  if (artist != null) {
+    if (town.isEmpty) {
+      town = artist.zone;
+    } else {
+      artist.zone = town;
+    }
+  }
+  return _accountFromMap(d, artist, town);
+}
+
+Account _accountFromMap(Map<String, dynamic> d, Artist? artist, String town) =>
+    Account(
+      role: UserRole.values.byName(d['role']),
+      name: d['name'] ?? '',
+      email: d['email'] ?? '',
+      phone: d['phone'] ?? '',
+      clientType: ClientType.values.byName(d['clientType'] ?? 'privado'),
+      businessName: d['businessName'] ?? '',
+      address: d['address'] ?? '',
+      town: town,
+      artist: artist,
+      smsOptIn: d['smsOptIn'] == true,
+      theme: d['theme'] as String?,
+    );
 
 /// Las fotos se guardan dentro del documento (máximo ~1 MB por documento),
 /// así que la galería se recorta si no cabe. Con Firebase Storage se podrán
@@ -735,6 +765,7 @@ Map<String, dynamic> artistToMap(Artist a) {
     'genres': a.genres,
     'bio': a.bio,
     'zone': a.zone,
+    'pueblo': a.zone,
     'color': a.color.toARGB32(),
     'tagline': a.tagline,
     'instruments': a.instruments,
@@ -775,7 +806,7 @@ Artist artistFromMap(String id, Map<String, dynamic> d) {
     category: ArtistCategory.solista,
     genres: [],
     bio: '',
-    zone: d['zone'] ?? 'Caguas',
+    zone: '',
     distanceKm: 0,
     rating: 0,
     reviews: 0,
@@ -796,6 +827,7 @@ void applyArtistMap(Artist a, Map<String, dynamic> d) {
 
   a
     ..name = d['name'] ?? a.name
+    ..zone = matchMunicipio(d['pueblo'] as String?) ?? ''
     ..category = ArtistCategory.values.byName(d['category'] ?? 'solista')
     ..genres = strings(d['genres'])
     ..bio = d['bio'] ?? ''

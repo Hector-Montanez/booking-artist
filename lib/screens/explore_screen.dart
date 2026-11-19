@@ -6,7 +6,7 @@ import '../theme.dart';
 import '../widgets/common.dart';
 import 'artist_detail_screen.dart';
 
-enum SortBy { distancia, precio, valoracion }
+enum SortBy { recomendados, precio, valoracion }
 
 class ExploreScreen extends StatefulWidget {
   const ExploreScreen({super.key, this.forArtist = false});
@@ -24,7 +24,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
   ArtistCategory? _category;
   String? _instrument;
   EventType? _eventType;
-  SortBy _sort = SortBy.distancia;
+  SortBy _sort = SortBy.recomendados;
 
   @override
   Widget build(BuildContext context) {
@@ -34,6 +34,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
         ? '¿A quién quieres contratar?'
         : 'Artistas en Tarima';
     final q = _query.toLowerCase();
+    // Los artistas del pueblo de quien busca salen primero.
+    final myTown = state.myTown;
+    bool local(Artist a) => myTown.isNotEmpty && a.zone == myTown;
     final list =
         state.artists.where((a) {
           // Un artista aparece cuando ya publicó al menos un precio y está
@@ -50,13 +53,22 @@ class _ExploreScreenState extends State<ExploreScreen> {
           return a.name.toLowerCase().contains(q) ||
               a.genres.any((g) => g.toLowerCase().contains(q)) ||
               a.instruments.any((i) => i.toLowerCase().contains(q));
-        }).toList()..sort(
-          (a, b) => switch (_sort) {
-            SortBy.distancia => a.distanceKm.compareTo(b.distanceKm),
-            SortBy.precio => a.minPrice.compareTo(b.minPrice),
+        }).toList()..sort((a, b) {
+          if (local(a) != local(b)) return local(a) ? -1 : 1;
+          return switch (_sort) {
+            SortBy.recomendados ||
             SortBy.valoracion => b.rating.compareTo(a.rating),
-          },
-        );
+            SortBy.precio => a.minPrice.compareTo(b.minPrice),
+          };
+        });
+    final localCount = list.where(local).length;
+    // Títulos entre los del pueblo y los demás.
+    final entries = <Object>[
+      if (localCount > 0) 'En $myTown',
+      ...list.take(localCount),
+      if (localCount > 0 && localCount < list.length) 'Otros pueblos',
+      ...list.skip(localCount),
+    ];
 
     return SafeArea(
       child: CustomScrollView(
@@ -94,11 +106,13 @@ class _ExploreScreenState extends State<ExploreScreen> {
                         color: Theme.of(context).colorScheme.primary,
                       ),
                       const SizedBox(width: 4),
-                      const Flexible(
+                      Flexible(
                         child: Text(
-                          'Puerto Rico',
+                          myTown.isEmpty
+                              ? 'Puerto Rico'
+                              : '$myTown, Puerto Rico',
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontWeight: FontWeight.w600),
+                          style: const TextStyle(fontWeight: FontWeight.w600),
                         ),
                       ),
                     ],
@@ -197,8 +211,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     children: [
                       Expanded(
                         child: Text(
-                          me == null
-                              ? '${list.length} artistas cerca de ti'
+                          localCount > 0
+                              ? '${list.length} artistas · $localCount en $myTown'
                               : '${list.length} artistas en la app',
                           style: Theme.of(context).textTheme.titleMedium,
                         ),
@@ -209,8 +223,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
                         onChanged: (v) => setState(() => _sort = v!),
                         items: const [
                           DropdownMenuItem(
-                            value: SortBy.distancia,
-                            child: Text('Más cerca'),
+                            value: SortBy.recomendados,
+                            child: Text('Recomendados'),
                           ),
                           DropdownMenuItem(
                             value: SortBy.precio,
@@ -236,24 +250,36 @@ class _ExploreScreenState extends State<ExploreScreen> {
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             sliver: SliverList.separated(
-              itemCount: list.length,
+              itemCount: entries.length,
               separatorBuilder: (_, _) => const SizedBox(height: 12),
-              itemBuilder: (_, i) => list[i] == me
-                  ? Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Padding(
-                          padding: EdgeInsets.only(bottom: 4),
-                          child: Chip(
-                            avatar: Icon(Icons.person_pin, size: 18),
-                            label: Text('Este eres tú'),
-                            visualDensity: VisualDensity.compact,
-                          ),
-                        ),
-                        ArtistCard(artist: list[i]),
-                      ],
-                    )
-                  : ArtistCard(artist: list[i]),
+              itemBuilder: (_, i) => switch (entries[i]) {
+                final String title => Padding(
+                  padding: EdgeInsets.only(top: i == 0 ? 0 : 8),
+                  child: Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+                final Artist a when a == me => Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 4),
+                      child: Chip(
+                        avatar: Icon(Icons.person_pin, size: 18),
+                        label: Text('Este eres tú'),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ),
+                    ArtistCard(artist: a),
+                  ],
+                ),
+                final Artist a => ArtistCard(artist: a),
+                _ => const SizedBox.shrink(),
+              },
             ),
           ),
         ],
@@ -358,7 +384,7 @@ class ArtistCard extends StatelessWidget {
                         ),
                         Flexible(
                           child: Text(
-                            ' ${artist.distanceKm} km · ${artist.zone}',
+                            ' ${artist.zone.isEmpty ? 'Puerto Rico' : artist.zone}',
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(color: Colors.grey.shade600),
                           ),
@@ -476,7 +502,7 @@ class _NeonArtistCard extends StatelessWidget {
                 right: 12,
                 child: _Pill(
                   icon: Icons.place,
-                  text: '${artist.distanceKm} km',
+                  text: artist.zone.isEmpty ? 'Puerto Rico' : artist.zone,
                 ),
               ),
               Positioned(

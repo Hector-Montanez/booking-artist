@@ -13,6 +13,7 @@ import 'screens/inbox_screen.dart';
 import 'screens/my_bookings_screen.dart';
 import 'screens/welcome_screen.dart';
 import 'theme.dart';
+import 'widgets/town_field.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -75,6 +76,20 @@ class _Shell extends StatefulWidget {
 
 class _ShellState extends State<_Shell> {
   int _tab = 0;
+  bool _askedTown = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Las cuentas creadas antes de pedir el pueblo lo escogen al entrar.
+    final state = AppScope.of(context);
+    if (!_askedTown && state.needsTown) {
+      _askedTown = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) askForTown(context, state, required: true);
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -116,6 +131,7 @@ class _ShellState extends State<_Shell> {
         : const [
             ExploreScreen(),
             MyBookingsScreen(),
+            ArtistCalendarScreen(forClient: true),
             InboxScreen(),
             AccountScreen(),
           ];
@@ -144,6 +160,10 @@ class _ShellState extends State<_Shell> {
               label: 'Explorar',
             ),
             NavigationDestination(icon: badge, label: 'Reservas'),
+            const NavigationDestination(
+              icon: Icon(Icons.calendar_month),
+              label: 'Calendario',
+            ),
             inbox,
             const NavigationDestination(
               icon: Icon(Icons.person),
