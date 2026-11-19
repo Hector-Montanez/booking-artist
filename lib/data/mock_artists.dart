@@ -109,7 +109,7 @@ List<Artist> _mockArtists() => [
     bio:
         'Cantante y guitarrista con 10 años de experiencia en restaurantes y '
         'bodas. Repertorio romántico en español e inglés.',
-    zone: 'Caguas Pueblo',
+    zone: 'Caguas',
     distanceKm: 1.8,
     rating: 4.9,
     reviews: 87,
@@ -154,7 +154,7 @@ List<Artist> _mockArtists() => [
     bio:
         'DJ para bodas y fiestas privadas. Equipo de sonido e iluminación '
         'propio. Mezclas a la medida de tu público.',
-    zone: 'Bairoa',
+    zone: 'San Juan',
     distanceKm: 3.4,
     rating: 4.8,
     reviews: 142,
@@ -203,7 +203,7 @@ List<Artist> _mockArtists() => [
     bio:
         'Orquesta de 7 músicos. Salsa, plena y bomba para bodas, '
         'aniversarios y eventos corporativos.',
-    zone: 'Río Cañas',
+    zone: 'Bayamón',
     distanceKm: 5.2,
     rating: 4.7,
     reviews: 64,
@@ -244,7 +244,7 @@ List<Artist> _mockArtists() => [
     category: ArtistCategory.agrupacion,
     genres: ['Jazz', 'Bossa nova', 'Lounge'],
     bio: 'Trío de piano, contrabajo y batería. Ideal para cenas, cócteles y galerías.',
-    zone: 'Turabo Gardens',
+    zone: 'Guaynabo',
     distanceKm: 2.6,
     rating: 4.9,
     reviews: 39,
@@ -283,7 +283,7 @@ List<Artist> _mockArtists() => [
     instruments: ['Cantante', 'Tecladista'],
     genres: ['Pop', 'Acústico', 'Infantil'],
     bio: 'Cantante para cumpleaños y fiestas familiares. Repertorio pop y canciones infantiles.',
-    zone: 'Villa del Rey',
+    zone: 'Caguas',
     distanceKm: 7.9,
     rating: 4.6,
     reviews: 22,
@@ -319,7 +319,7 @@ List<Artist> _mockArtists() => [
     category: ArtistCategory.dj,
     genres: ['Salsa', 'Reggaetón', 'Clásicos'],
     bio: 'Música latina y clásicos boricuas para bodas, quinceañeros y cumpleaños.',
-    zone: 'San Antonio',
+    zone: 'Ponce',
     distanceKm: 11.3,
     rating: 4.5,
     reviews: 51,
@@ -348,7 +348,7 @@ List<Artist> _mockArtists() => [
     bio:
         'Percusionista con 15 años tocando en orquestas de salsa. '
         'Disponible para sustituciones, grabaciones y tríos.',
-    zone: 'Bairoa',
+    zone: 'Carolina',
     distanceKm: 3.1,
     rating: 4.9,
     reviews: 28,
@@ -379,7 +379,7 @@ List<Artist> _mockArtists() => [
     instruments: ['Bajista'],
     genres: ['Salsa', 'Pop', 'Jazz'],
     bio: 'Bajista eléctrica y acústica. Lee partitura y cifrado.',
-    zone: 'Turabo Gardens',
+    zone: 'Gurabo',
     distanceKm: 2.9,
     rating: 4.8,
     reviews: 17,
@@ -408,7 +408,7 @@ List<Artist> _mockArtists() => [
     bio:
         'Cuatrista para parrandas, trovadores y agrupaciones típicas. '
         'Repertorio navideño completo.',
-    zone: 'Río Cañas',
+    zone: 'Cayey',
     distanceKm: 4.7,
     rating: 5.0,
     reviews: 9,
@@ -440,7 +440,7 @@ List<Artist> _mockArtists() => [
     bio:
         'Show de payasos para cumpleaños y actividades familiares: juegos, '
         'concursos, figuras de globos y pintacaras. Lleva su propio sonido.',
-    zone: 'Villa del Rey',
+    zone: 'Caguas',
     distanceKm: 3.6,
     rating: 4.9,
     reviews: 54,

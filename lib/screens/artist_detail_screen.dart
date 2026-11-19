@@ -146,7 +146,9 @@ class ArtistDetailScreen extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         const Icon(Icons.place, size: 16),
-                        Text(' ${artist.distanceKm} km · ${artist.zone}'),
+                        Text(
+                          ' ${artist.zone.isEmpty ? 'Puerto Rico' : artist.zone}',
+                        ),
                       ],
                     ),
                   ],

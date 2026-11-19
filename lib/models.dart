@@ -283,7 +283,10 @@ class Artist {
   ArtistCategory category;
   List<String> genres;
   String bio;
-  final String zone;
+
+  /// Pueblo del artista (uno de los 78 de Puerto Rico). Vacío si todavía no
+  /// lo escogió.
+  String zone;
   final double distanceKm;
 
   /// Valoración de ejemplo (artistas de la demo). Se combina con las reseñas
@@ -601,7 +604,7 @@ class Account {
     this.clientType = ClientType.privado,
     this.businessName = '',
     this.address = '',
-    this.town = 'Caguas',
+    this.town = '',
     this.artist,
     this.password = '',
     this.smsOptIn = false,
@@ -615,6 +618,9 @@ class Account {
   ClientType clientType;
   String businessName;
   String address;
+
+  /// Pueblo de Puerto Rico donde vive o tiene su negocio (uno de los 78 de
+  /// [municipios]). Vacío si la cuenta es de antes de pedirlo.
   String town;
 
   /// Aceptó recibir SMS sobre sus reservas. Sin esto el servidor no le envía

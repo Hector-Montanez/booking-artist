@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'cloud.dart';
 import 'data/mock_artists.dart';
 import 'models.dart';
+import 'places.dart' show matchMunicipio;
 import 'theme.dart';
 
 /// Estado en memoria del prototipo. Más adelante esto vendrá de un backend.
@@ -53,6 +54,7 @@ class AppState extends ChangeNotifier {
         clientType: ClientType.restaurante,
         businessName: 'Restaurante El Patio',
         address: 'Calle Ruiz Belvis 10',
+        town: 'Caguas',
         password: demoPassword,
       ),
       Account(
@@ -335,6 +337,31 @@ class AppState extends ChangeNotifier {
     if (a.artist != null) artists.remove(a.artist);
     signOut();
     return null;
+  }
+
+  /// Pueblo de quien tiene la sesión abierta ('' si no lo ha escogido). El
+  /// del artista es el de su página.
+  String get myTown {
+    final a = account;
+    if (a == null) return '';
+    return a.artist?.zone ?? a.town;
+  }
+
+  /// La cuenta es de antes de pedir el pueblo y todavía no lo escogió.
+  bool get needsTown => account != null && matchMunicipio(myTown) == null;
+
+  /// Guarda el pueblo en la cuenta (y en la página si es artista).
+  void setTown(String town) {
+    final a = account;
+    if (a == null) return;
+    a.town = town;
+    final artist = a.artist;
+    if (artist != null) {
+      artist.zone = town;
+      cloud?.saveArtist(artist);
+    }
+    cloud?.saveTown(town);
+    notifyListeners();
   }
 
   /// Cambia el estilo visual y lo guarda en la cuenta.

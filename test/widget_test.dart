@@ -5,6 +5,22 @@ import 'package:booking_artist/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+/// Abre la lista de pueblos y escoge uno.
+Future<void> pickTown(WidgetTester tester, String town) async {
+  final field = find.byType(DropdownButtonFormField<String>).last;
+  await tester.ensureVisible(field);
+  await tester.tap(field);
+  await tester.pumpAndSettle();
+  await tester.dragUntilVisible(
+    find.text(town),
+    find.byType(Scrollable).last,
+    const Offset(0, -100),
+  );
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(town).last);
+  await tester.pumpAndSettle();
+}
+
 void main() {
   testWidgets('Un restaurante crea su cuenta y ve los artistas', (
     tester,
@@ -31,9 +47,10 @@ void main() {
     await tester.enterText(fields.at(0), 'El Patio');
     await tester.enterText(fields.at(1), 'Ana Ortiz');
     await tester.enterText(fields.at(2), 'Calle Ruiz Belvis 10');
-    await tester.enterText(fields.at(4), '787 555 1234');
-    await tester.enterText(fields.at(5), 'ana@elpatio.com');
-    await tester.enterText(fields.at(6), 'secreto1');
+    await tester.enterText(fields.at(3), '787 555 1234');
+    await tester.enterText(fields.at(4), 'ana@elpatio.com');
+    await tester.enterText(fields.at(5), 'secreto1');
+    await pickTown(tester, 'Caguas');
     // El permiso para SMS empieza sin marcar.
     expect(state.account, isNull);
     await tester.ensureVisible(find.text(smsConsentTitle));
@@ -50,7 +67,15 @@ void main() {
     state.setStyle(AppStyle.clasico);
     expect(state.account?.theme, 'clasico');
     expect(appStyle.value, AppStyle.clasico);
-    expect(find.text('Puerto Rico'), findsOneWidget);
+    expect(state.account?.town, 'Caguas');
+    expect(find.text('Caguas, Puerto Rico'), findsOneWidget);
+    // Los artistas de Caguas salen primero, bajo su título.
+    expect(find.text('En Caguas'), findsOneWidget);
+    expect(find.text('Otros pueblos'), findsOneWidget);
+    final caguasY = tester.getTopLeft(find.text('Sofía Rivera')).dy;
+    final otherY = tester.getTopLeft(find.text('Otros pueblos')).dy;
+    expect(caguasY, lessThan(otherY));
+    expect(tester.getTopLeft(find.text('DJ Nova')).dy, greaterThan(otherY));
     await tester.tap(find.text('Sofía Rivera'));
     await tester.pumpAndSettle();
     expect(find.text('Precios del artista'), findsOneWidget);
@@ -82,6 +107,7 @@ void main() {
     await fill('Nombre artístico', 'Trío Borinquen');
     await fill('Tu nombre (privado)', 'Luis Rivera');
     await fill('Géneros', 'Bolero, Trova');
+    await pickTown(tester, 'Ponce');
     await fill('Teléfono', '7875551234');
     await fill('Correo electrónico', 'luis@example.com');
     await fill('Contraseña', 'secreto1');
@@ -90,6 +116,8 @@ void main() {
 
     expect(state.myArtistProfile.name, 'Trío Borinquen');
     expect(state.myArtistProfile.instruments, ['Bongosero']);
+    expect(state.myArtistProfile.zone, 'Ponce');
+    expect(state.myTown, 'Ponce');
     expect(find.text('Solicitudes'), findsOneWidget);
     await tester.tap(find.text('Mi página'));
     await tester.pumpAndSettle();
@@ -98,5 +126,33 @@ void main() {
       'Boleros de siempre',
     );
     expect(state.myArtistProfile.tagline, 'Boleros de siempre');
+  });
+
+  testWidgets('Una cuenta sin pueblo lo escoge al entrar', (tester) async {
+    tester.view.physicalSize = const Size(1080, 4000);
+    tester.view.devicePixelRatio = 2.5;
+    addTearDown(tester.view.reset);
+    final state = AppState();
+    await tester.pumpWidget(
+      AppScope(state: state, child: const BookingArtistApp()),
+    );
+    // Cuenta creada antes de que la app pidiera el pueblo.
+    state.signIn(
+      Account(
+        role: UserRole.cliente,
+        name: 'Cliente Viejo',
+        email: 'viejo@example.com',
+        phone: '787 555 0000',
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(state.needsTown, isTrue);
+    expect(find.text('¿De qué pueblo eres?'), findsOneWidget);
+    await pickTown(tester, 'Bayamón');
+    await tester.tap(find.text('Guardar'));
+    await tester.pumpAndSettle();
+    expect(state.needsTown, isFalse);
+    expect(state.account?.town, 'Bayamón');
+    expect(find.text('En Bayamón'), findsOneWidget);
   });
 }

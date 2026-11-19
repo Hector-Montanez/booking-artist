@@ -8,6 +8,7 @@ import '../widgets/pickers.dart';
 import '../theme.dart';
 import '../widgets/stage_slideshow.dart';
 import '../widgets/theme_picker.dart';
+import '../widgets/town_field.dart';
 
 String? _required(String? v) =>
     (v == null || v.trim().isEmpty) ? 'Campo requerido' : null;
@@ -94,7 +95,7 @@ class _ClientSignupScreenState extends State<ClientSignupScreen>
   final _name = TextEditingController();
   final _business = TextEditingController();
   final _address = TextEditingController();
-  final _town = TextEditingController(text: 'Caguas');
+  String? _town;
   final _email = TextEditingController();
   final _phone = TextEditingController();
   bool _smsOptIn = false;
@@ -102,15 +103,7 @@ class _ClientSignupScreenState extends State<ClientSignupScreen>
 
   @override
   void dispose() {
-    for (final c in [
-      _name,
-      _business,
-      _address,
-      _town,
-      _email,
-      _phone,
-      _pass,
-    ]) {
+    for (final c in [_name, _business, _address, _email, _phone, _pass]) {
       c.dispose();
     }
     super.dispose();
@@ -184,10 +177,10 @@ class _ClientSignupScreenState extends State<ClientSignupScreen>
             ),
             validator: _required,
           ),
-        TextFormField(
-          controller: _town,
-          decoration: _deco('Pueblo', Icons.location_city),
-          validator: _required,
+        PuebloField(
+          value: _town,
+          helper: 'Te mostramos primero los artistas de tu pueblo',
+          onChanged: (t) => setState(() => _town = t),
         ),
         TextFormField(
           controller: _phone,
@@ -228,7 +221,7 @@ class _ClientSignupScreenState extends State<ClientSignupScreen>
         clientType: _type,
         businessName: _type.hasBusinessName ? _business.text.trim() : '',
         address: _type == ClientType.restaurante ? _address.text.trim() : '',
-        town: _town.text.trim(),
+        town: _town!,
         password: _pass.text,
       ),
     );
@@ -250,6 +243,7 @@ class _ArtistSignupScreenState extends State<ArtistSignupScreen>
   final _stage = TextEditingController();
   final _name = TextEditingController();
   final _genres = TextEditingController();
+  String? _town;
   final _email = TextEditingController();
   final _phone = TextEditingController();
   bool _smsOptIn = false;
@@ -321,6 +315,11 @@ class _ArtistSignupScreenState extends State<ArtistSignupScreen>
                 ),
           validator: _required,
         ),
+        PuebloField(
+          value: _town,
+          helper: 'Los clientes de tu pueblo te ven entre los primeros',
+          onChanged: (t) => setState(() => _town = t),
+        ),
         TextFormField(
           controller: _phone,
           keyboardType: TextInputType.phone,
@@ -367,8 +366,8 @@ class _ArtistSignupScreenState extends State<ArtistSignupScreen>
           .where((g) => g.isNotEmpty)
           .toList(),
       bio: '',
-      zone: 'Caguas',
-      distanceKm: 1.0,
+      zone: _town!,
+      distanceKm: 0,
       rating: 0,
       reviews: 0,
       color: const Color(0xFF6A1B9A),
@@ -385,6 +384,7 @@ class _ArtistSignupScreenState extends State<ArtistSignupScreen>
         phone: _phone.text.trim(),
         smsOptIn: _smsOptIn,
         theme: appStyle.value.name,
+        town: _town!,
         artist: artist,
         password: _pass.text,
       ),

@@ -5,6 +5,7 @@ import '../app_state.dart';
 import '../cloud.dart' show apiUri;
 import '../models.dart';
 import '../widgets/theme_picker.dart';
+import '../widgets/town_field.dart';
 
 class AccountScreen extends StatefulWidget {
   const AccountScreen({super.key});
@@ -44,8 +45,18 @@ class _AccountScreenState extends State<AccountScreen> {
                 if (a.address.isNotEmpty)
                   ListTile(
                     leading: const Icon(Icons.place),
-                    title: Text('${a.address}, ${a.town}'),
+                    title: Text(a.address),
+                    subtitle: const Text('Dirección'),
                   ),
+                ListTile(
+                  leading: const Icon(Icons.location_city),
+                  title: Text(
+                    state.myTown.isEmpty ? 'Escoge tu pueblo' : state.myTown,
+                  ),
+                  subtitle: const Text('Pueblo'),
+                  trailing: const Icon(Icons.edit),
+                  onTap: () => askForTown(context, state),
+                ),
                 ListTile(
                   leading: const Icon(Icons.phone),
                   title: Text(a.phone),
