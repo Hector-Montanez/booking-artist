@@ -13,7 +13,18 @@ let callerUid = 'client1';
 const fakeAdmin = {
   apps: [1], app: () => {},
   auth: () => ({ verifyIdToken: async (t) => { if (!t) throw new Error('x'); return { uid: callerUid }; } }),
-  firestore: () => ({ collection: (c) => ({ doc: (id) => doc(c, id) }) }),
+  firestore: () => ({
+    collection: (c) => ({
+      doc: (id) => doc(c, id),
+      where: (f, op, v) => ({
+        get: async () => ({
+          docs: Object.keys(store)
+            .filter((k) => k.startsWith(`${c}/`) && store[k][f] === v)
+            .map((k) => ({ id: k.slice(c.length + 1), data: () => ({ ...store[k] }) })),
+        }),
+      }),
+    }),
+  }),
 };
 const origLoad = Module._load;
 Module._load = function (req, ...a) { return req === 'firebase-admin' ? fakeAdmin : origLoad.call(this, req, ...a); };
@@ -150,6 +161,54 @@ const assert = require('assert');
   mk('b11');
   r = await call({ action: 'start', bookingId: 'b11', method: 'tarjeta' });
   assert.equal(r.payment, 'sinPago', 'no se cobra aunque pidan tarjeta');
+  process.env.IN_APP_PAYMENTS = 'on';
+
+  // Cotización: sin precio fijo. El artista envía su precio y el cliente lo
+  // acepta. Funciona con cualquier perfil de la cuenta (art1__2 es de art1).
+  delete process.env.IN_APP_PAYMENTS;
+  store['artists/art1__2'] = { name: 'Sofía Trío', ownerUid: 'art1' };
+  const day = Date.UTC(2030, 5, 1, 23);
+  const mkQuote = (id, artistId, start = day) => {
+    store[`bookings/${id}`] = { clientUid: 'client1', artistId, artistUid: 'art1', package: 'Cotización', status: 'pendiente', payment: 'porPagar', total: 0, amountCharged: 0, start, hours: 2 };
+  };
+  mkQuote('q1', 'art1__2');
+  r = await call({ action: 'start', bookingId: 'q1', method: 'ninguno' });
+  assert.equal(r.payment, 'sinPago', 'la membresía de la cuenta cubre el perfil extra');
+  assert.equal(store['bookings/q1'].total, 0);
+  assert.ok(!store['busy/q1'], 'pedir precio no aparta la hora');
+  assert.equal((await call({ action: 'quote', bookingId: 'q1', price: 400 }, 'client1')).code, 403, 'el cliente no pone el precio');
+  assert.equal((await call({ action: 'quote', bookingId: 'q1', price: 400 }, 'otro')).code, 403);
+  assert.equal((await call({ action: 'quote', bookingId: 'q1', price: -5 }, 'art1')).code, 400);
+  r = await call({ action: 'quote', bookingId: 'q1', price: '450', note: 'Con sonido' }, 'art1');
+  assert.equal(r.status, 'cotizada');
+  assert.equal(store['bookings/q1'].quotePrice, 450);
+  assert.equal(store['bookings/q1'].quoteNote, 'Con sonido');
+  assert.equal((await call({ action: 'acceptQuote', bookingId: 'q1' }, 'art1')).code, 403, 'solo el cliente acepta');
+  r = await call({ action: 'acceptQuote', bookingId: 'q1' });
+  assert.equal(r.status, 'confirmada');
+  assert.equal(store['bookings/q1'].total, 450);
+  assert.equal(store['busy/q1'].artistUid, 'art1');
+  assert.equal((await call({ action: 'acceptQuote', bookingId: 'q1' })).code, 409);
+
+  // Otra cotización a la misma hora (otro perfil de la misma persona): ya no
+  // se puede aceptar.
+  mkQuote('q2', 'art1', day + 3600000);
+  await call({ action: 'start', bookingId: 'q2', method: 'ninguno' });
+  await call({ action: 'quote', bookingId: 'q2', price: 300 }, 'art1');
+  r = await call({ action: 'acceptQuote', bookingId: 'q2' });
+  assert.equal(r.code, 409);
+  assert.equal(store['bookings/q2'].status, 'cotizada');
+  // El cliente dice que no al precio.
+  r = await call({ action: 'cancel', bookingId: 'q2' });
+  assert.equal(r.status, 'cancelada');
+
+  // El artista confirma directo con el precio acordado por WhatsApp.
+  mkQuote('q3', 'art1__2', day + 7 * 86400000);
+  await call({ action: 'start', bookingId: 'q3', method: 'ninguno' });
+  r = await call({ action: 'accept', bookingId: 'q3', price: 380 }, 'art1');
+  assert.equal(r.status, 'confirmada');
+  assert.equal(store['bookings/q3'].total, 380);
+  assert.ok(store['busy/q3']);
   process.env.IN_APP_PAYMENTS = 'on';
 
   // Artista sin suscripción ni mes gratis: no se le puede reservar.

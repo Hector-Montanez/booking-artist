@@ -77,7 +77,10 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
     final upcoming =
         _state.bookings
             .where(
-              (b) => b.artist == _me && b.blocksSchedule && b.end.isAfter(now),
+              (b) =>
+                  b.artist.ownerUid == _me.ownerUid &&
+                  b.blocksSchedule &&
+                  b.end.isAfter(now),
             )
             .toList()
           ..sort((a, b) => a.start.compareTo(b.start));

@@ -247,6 +247,7 @@ class _ArtistSignupScreenState extends State<ArtistSignupScreen>
   final _email = TextEditingController();
   final _phone = TextEditingController();
   bool _smsOptIn = false;
+  bool _whatsapp = true;
   final _pass = TextEditingController();
 
   @override
@@ -326,6 +327,18 @@ class _ArtistSignupScreenState extends State<ArtistSignupScreen>
           decoration: _deco('Teléfono', Icons.phone, hint: '787 555 1234'),
           validator: _validPhone,
         ),
+        CheckboxListTile(
+          value: _whatsapp,
+          onChanged: (v) => setState(() => _whatsapp = v!),
+          controlAffinity: ListTileControlAffinity.leading,
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Este número tiene WhatsApp'),
+          subtitle: const Text(
+            'Los clientes te pueden escribir por WhatsApp para preguntar tu '
+            'precio. El número se ve en tu página; lo puedes cambiar o quitar '
+            'en Mi página.',
+          ),
+        ),
         _SmsConsent(
           value: _smsOptIn,
           onChanged: (v) => setState(() => _smsOptIn = v),
@@ -371,10 +384,10 @@ class _ArtistSignupScreenState extends State<ArtistSignupScreen>
       rating: 0,
       reviews: 0,
       color: const Color(0xFF6A1B9A),
-      packages: [],
       links: [],
       eventTypes: EventType.values.toSet(),
       email: _email.text.trim(),
+      whatsapp: _whatsapp ? _phone.text.trim() : '',
     );
     await _create(
       Account(

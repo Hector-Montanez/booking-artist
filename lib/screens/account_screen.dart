@@ -33,8 +33,12 @@ class _AccountScreenState extends State<AccountScreen> {
                   leading: Icon(
                     isArtist ? Icons.mic_external_on : a.clientType.icon,
                   ),
-                  title: Text(isArtist ? a.artist!.name : a.displayName),
-                  subtitle: Text(isArtist ? 'Artista' : a.clientType.label),
+                  title: Text(isArtist ? a.name : a.displayName),
+                  subtitle: Text(
+                    isArtist
+                        ? 'Artista · ${a.profiles.map((p) => p.name).join(', ')}'
+                        : a.clientType.label,
+                  ),
                 ),
                 if (!isArtist && a.clientType == ClientType.restaurante)
                   ListTile(

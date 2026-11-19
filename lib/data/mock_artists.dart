@@ -31,6 +31,28 @@ List<Artist> buildMockArtists() {
   final sofia = list.firstWhere((a) => a.id == 'a1')
     ..subscription = null
     ..createdAt = DateTime.now();
+  // Segundo perfil de la misma cuenta: su trío. La membresía de Sofía cubre
+  // los dos.
+  list.insert(
+    list.indexOf(sofia) + 1,
+    Artist(
+      id: 'a1__2',
+      name: 'Sofía Rivera Trío',
+      category: ArtistCategory.agrupacion,
+      genres: ['Bolero', 'Trío'],
+      bio:
+          'Sofía con guitarra, requinto y bajo. Boleros y música romántica '
+          'para bodas y actividades.',
+      zone: 'Caguas',
+      distanceKm: 1.8,
+      rating: 0,
+      reviews: 0,
+      color: const Color(0xFF3949AB),
+      eventTypes: {EventType.boda, EventType.actividad, EventType.cumpleanos},
+      links: [],
+      whatsapp: '787 555 0202',
+    )..createdAt = sofia.createdAt,
+  );
   sofia.reviewList.addAll([
     Review(
       id: 'rev-ejemplo-1',
@@ -72,14 +94,7 @@ List<Artist> _mockArtists() => [
         'Perfil de prueba sin afiliación con el artista. '
         'Precios, distancia y valoración son de ejemplo.',
     eventTypes: {EventType.restaurante, EventType.cumpleanos, EventType.boda},
-    packages: [
-      PricePackage(
-        name: 'Set acústico (ejemplo)',
-        price: 200,
-        hours: 2,
-        kind: PackageKind.restaurante,
-      ),
-    ],
+    priceFrom: 200,
     links: [
       MediaLink(
         kind: LinkKind.instagram,
@@ -116,21 +131,8 @@ List<Artist> _mockArtists() => [
     color: const Color(0xFF8E24AA),
     verified: true,
     eventTypes: {EventType.restaurante, EventType.boda, EventType.cumpleanos},
-    packages: [
-      PricePackage(
-        name: 'Cena acústica',
-        price: 180,
-        hours: 2,
-        description: 'Voz y guitarra.',
-        kind: PackageKind.restaurante,
-      ),
-      PricePackage(
-        name: 'Ceremonia de boda',
-        price: 350,
-        hours: 1.5,
-        description: 'Entrada, ceremonia y salida. Incluye sonido.',
-      ),
-    ],
+    // Sin precio de referencia: todo se cotiza.
+    whatsapp: '787 555 0202',
     links: [
       MediaLink(
         kind: LinkKind.youtube,
@@ -161,20 +163,7 @@ List<Artist> _mockArtists() => [
     color: const Color(0xFF1E88E5),
     verified: true,
     eventTypes: {EventType.boda, EventType.cumpleanos, EventType.actividad},
-    packages: [
-      PricePackage(
-        name: 'Fiesta 4 horas',
-        price: 400,
-        hours: 4,
-        description: 'Sonido para 100 personas.',
-      ),
-      PricePackage(
-        name: 'Boda completa',
-        price: 750,
-        hours: 6,
-        description: 'Ceremonia, cóctel y fiesta. Luces incluidas.',
-      ),
-    ],
+    priceFrom: 400,
     links: [
       MediaLink(
         kind: LinkKind.youtube,
@@ -209,20 +198,7 @@ List<Artist> _mockArtists() => [
     reviews: 64,
     color: const Color(0xFFE65100),
     eventTypes: {EventType.boda, EventType.actividad, EventType.cumpleanos},
-    packages: [
-      PricePackage(
-        name: 'Show 2 sets',
-        price: 1200,
-        hours: 2,
-        description: '2 sets de 45 minutos.',
-      ),
-      PricePackage(
-        name: 'Evento completo',
-        price: 1900,
-        hours: 4,
-        description: '4 sets, sonido incluido.',
-      ),
-    ],
+    priceFrom: 1200,
     links: [
       MediaLink(
         kind: LinkKind.youtube,
@@ -251,16 +227,7 @@ List<Artist> _mockArtists() => [
     color: const Color(0xFF00897B),
     verified: true,
     eventTypes: {EventType.restaurante, EventType.actividad, EventType.boda},
-    packages: [
-      PricePackage(
-        name: 'Cena en restaurante',
-        price: 380,
-        hours: 2,
-        kind: PackageKind.restaurante,
-      ),
-      PricePackage(name: 'Cóctel', price: 450, hours: 2),
-      PricePackage(name: 'Cena + cóctel', price: 700, hours: 3.5),
-    ],
+    priceFrom: 380,
     links: [
       MediaLink(
         kind: LinkKind.youtube,
@@ -289,15 +256,7 @@ List<Artist> _mockArtists() => [
     reviews: 22,
     color: const Color(0xFFD81B60),
     eventTypes: {EventType.cumpleanos, EventType.restaurante},
-    packages: [
-      PricePackage(name: 'Cumpleaños infantil', price: 150, hours: 1),
-      PricePackage(
-        name: 'Show acústico',
-        price: 220,
-        hours: 2,
-        kind: PackageKind.restaurante,
-      ),
-    ],
+    priceFrom: 150,
     links: [
       MediaLink(
         kind: LinkKind.youtube,
@@ -325,10 +284,7 @@ List<Artist> _mockArtists() => [
     reviews: 51,
     color: const Color(0xFF6D4C41),
     eventTypes: {EventType.cumpleanos, EventType.boda, EventType.actividad},
-    packages: [
-      PricePackage(name: 'Fiesta 3 horas', price: 280, hours: 3),
-      PricePackage(name: 'Fiesta 5 horas', price: 420, hours: 5),
-    ],
+    priceFrom: 280,
     links: [
       MediaLink(
         kind: LinkKind.youtube,
@@ -358,10 +314,7 @@ List<Artist> _mockArtists() => [
       EventType.restaurante,
       EventType.boda,
     },
-    packages: [
-      PricePackage(name: 'Toque con agrupación', price: 120, hours: 3),
-      PricePackage(name: 'Ensayo', price: 40, hours: 2),
-    ],
+    priceFrom: 40,
     links: [
       MediaLink(
         kind: LinkKind.youtube,
@@ -385,10 +338,7 @@ List<Artist> _mockArtists() => [
     reviews: 17,
     color: const Color(0xFF00695C),
     eventTypes: {EventType.conAgrupacion, EventType.boda},
-    packages: [
-      PricePackage(name: 'Toque con agrupación', price: 110, hours: 3),
-      PricePackage(name: 'Sesión de grabación', price: 90, hours: 2),
-    ],
+    priceFrom: 90,
     links: [
       MediaLink(
         kind: LinkKind.youtube,
@@ -418,10 +368,7 @@ List<Artist> _mockArtists() => [
       EventType.actividad,
       EventType.cumpleanos,
     },
-    packages: [
-      PricePackage(name: 'Parranda', price: 150, hours: 3),
-      PricePackage(name: 'Toque con agrupación', price: 130, hours: 3),
-    ],
+    priceFrom: 130,
     links: [
       MediaLink(
         kind: LinkKind.youtube,
@@ -446,20 +393,7 @@ List<Artist> _mockArtists() => [
     reviews: 54,
     color: const Color(0xFFE91E63),
     eventTypes: {EventType.cumpleanos, EventType.actividad},
-    packages: [
-      PricePackage(
-        name: 'Show de 1 hora',
-        price: 150,
-        hours: 1,
-        description: 'Juegos, concursos y globos.',
-      ),
-      PricePackage(
-        name: 'Fiesta completa',
-        price: 260,
-        hours: 2,
-        description: 'Show, pintacaras y piñata animada.',
-      ),
-    ],
+    priceFrom: 150,
     links: [
       MediaLink(
         kind: LinkKind.youtube,

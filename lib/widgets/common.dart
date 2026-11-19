@@ -246,3 +246,80 @@ class ReviewTile extends StatelessWidget {
     );
   }
 }
+
+/// Precio de referencia del artista ("Desde $180"), o "Precio a cotizar" si
+/// prefiere no poner precio.
+String priceLabel(Artist a) =>
+    a.priceFrom == null ? 'Precio a cotizar' : 'Desde ${money(a.priceFrom!)}';
+
+/// Verde de WhatsApp.
+const whatsappGreen = Color(0xFF25D366);
+
+/// Texto que se le envía al artista por WhatsApp para pedirle su precio.
+String quoteWhatsappText({
+  required Artist artist,
+  EventType? eventType,
+  String when = '',
+  String place = '',
+}) {
+  final what = eventType == null
+      ? 'un evento'
+      : switch (eventType) {
+          EventType.restaurante => 'tocar en mi restaurante',
+          EventType.actividad => 'una actividad',
+          EventType.boda => 'una boda',
+          EventType.cumpleanos => 'un cumpleaños',
+          EventType.conAgrupacion => 'tocar con mi agrupación',
+        };
+  final where = place.isEmpty ? '' : ' en $place';
+  return 'Hola ${artist.name}, te vi en Tarima. Me interesa contratarte '
+      'para $what$when$where. ¿Cuánto cobrarías?';
+}
+
+/// Abre WhatsApp con el chat del artista y el mensaje ya escrito.
+Future<void> openWhatsApp(BuildContext context, Artist artist, String message) {
+  // Espacios como %20 (con "+" WhatsApp los muestra tal cual).
+  final url =
+      'https://wa.me/${whatsappDigits(artist.whatsapp)}'
+      '?text=${Uri.encodeComponent(message)}';
+  return openLink(context, url);
+}
+
+/// Botón verde para escribirle al artista por WhatsApp.
+class WhatsAppButton extends StatelessWidget {
+  const WhatsAppButton({
+    super.key,
+    required this.artist,
+    required this.message,
+    this.compact = false,
+  });
+
+  final Artist artist;
+  final String message;
+
+  /// Solo el ícono (para barras con poco espacio).
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!artist.hasWhatsapp) return const SizedBox.shrink();
+    void open() => openWhatsApp(context, artist, message);
+    if (compact) {
+      return IconButton.outlined(
+        tooltip: 'Escribir por WhatsApp',
+        color: whatsappGreen,
+        style: IconButton.styleFrom(
+          side: const BorderSide(color: whatsappGreen),
+        ),
+        icon: const Icon(Icons.chat_rounded),
+        onPressed: open,
+      );
+    }
+    return TextButton.icon(
+      style: TextButton.styleFrom(foregroundColor: whatsappGreen),
+      icon: const Icon(Icons.chat_rounded),
+      label: const Text('WhatsApp'),
+      onPressed: open,
+    );
+  }
+}

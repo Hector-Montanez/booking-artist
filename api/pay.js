@@ -26,6 +26,8 @@ const FEE_RATE = Number(process.env.FEE_RATE || 0.1);
 // cliente le paga directo al artista). Para encender los pagos de actividades,
 // poner IN_APP_PAYMENTS=on en Vercel y `inAppPayments = true` en la app.
 const inAppPayments = () => process.env.IN_APP_PAYMENTS === 'on';
+// Valor de `package` en las solicitudes de cotización (igual que en la app).
+const QUOTE = 'Cotización';
 const ATHM_URL = 'https://payments.athmovil.com/api/business-transaction/ecommerce';
 const ATHM_MAX = 1500; // Límite de ATH Móvil por pago.
 
@@ -56,9 +58,61 @@ class Fail extends Error {
   }
 }
 
-// ---------- Montos ----------
+// ---------- Perfiles ----------
+
+// Una cuenta de artista puede tener varias páginas (perfiles): la primera
+// tiene el id de la cuenta y las demás "<cuenta>__<n>". La membresía y las
+// solicitudes son de la cuenta.
+const ownerOf = (artistId) => String(artistId || '').split('__')[0];
+const isArtistOf = (b, uid) => !!uid && (ownerOf(b.artistId) === uid || b.artistUid === uid);
+
+// Solicitudes abiertas: el cliente pidió precio (pendiente) o el artista ya
+// le envió uno (cotizada).
+const OPEN = ['pendiente', 'cotizada'];
 
 const round2 = (n) => Math.round(n * 100) / 100;
+
+/** Precio que escribe el artista: número positivo razonable, con centavos. */
+function parsePrice(v, required) {
+  if (v === undefined || v === null || v === '') {
+    if (required) throw new Fail(400, 'Escribe tu precio');
+    return null;
+  }
+  const n = Number(v);
+  if (!Number.isFinite(n) || n <= 0 || n > 100000) throw new Fail(400, 'El precio no es válido');
+  return round2(n);
+}
+
+/** Ocupa la hora en busy/{id} (sin datos del cliente) para que nadie más la tome. */
+async function holdTime(db, ref, b) {
+  await db.collection('busy').doc(ref.id).set({
+    artistId: b.artistId,
+    artistUid: ownerOf(b.artistId),
+    clientUid: b.clientUid,
+    start: b.start,
+    end: b.start + b.hours * 3600000,
+  });
+}
+
+/** Otra reserva confirmada de la misma persona (cualquier perfil) choca con esta. */
+async function conflicts(db, id, b) {
+  const owner = ownerOf(b.artistId);
+  const start = Number(b.start);
+  const end = start + Number(b.hours) * 3600000;
+  const snaps = await Promise.all([
+    db.collection('busy').where('artistUid', '==', owner).get(),
+    db.collection('busy').where('artistId', '==', owner).get(),
+  ]);
+  return snaps.some((snap) =>
+    snap.docs.some((d) => {
+      if (d.id === id) return false;
+      const x = d.data();
+      return Number(x.start) < end && Number(x.end) > start;
+    }),
+  );
+}
+
+// ---------- Montos ----------
 
 /**
  * Mismo cálculo que la app (booking_screen.dart), hecho con los datos del servidor.
@@ -147,10 +201,18 @@ async function start(req, db, caller, body) {
 
   const artist = (await db.collection('artists').doc(b.artistId).get()).data();
   if (!artist) throw new Fail(404, 'El artista ya no existe');
-  // Solo se reserva a artistas suscritos o en su mes gratis.
-  let sub = (await db.collection('subscriptions').doc(b.artistId).get()).data();
-  if (!sub) sub = { trialEnd: await subscription.trialEndFor(db, b.artistId) };
+  // Solo se reserva a artistas con la membresía activa o en su mes gratis.
+  // La membresía es de la cuenta y cubre todos sus perfiles.
+  const owner = ownerOf(b.artistId);
+  let sub = (await db.collection('subscriptions').doc(owner).get()).data();
+  if (!sub) sub = { trialEnd: await subscription.trialEndFor(db, owner) };
   if (!subscription.visible(sub)) throw new Fail(409, 'Este artista no está recibiendo reservas ahora');
+  // Solicitud de cotización: no hay precio todavía y no se cobra nada. El
+  // artista responde con su precio (acción quote).
+  if (b.package === QUOTE) {
+    await ref.update({ total: 0, amountCharged: 0, fee: 0, payDeposit: false, noDeposit: true, paymentMethod: 'ninguno', cardLast4: '', payment: 'sinPago' });
+    return { payment: 'sinPago', amount: 0 };
+  }
   const m = amounts(artist, b.package);
   const concept = `${b.package} · ${artist.name}`.slice(0, 80);
   const common = { total: m.total, amountCharged: m.dueNow, fee: m.fee, payDeposit: false };
@@ -245,7 +307,7 @@ async function start(req, db, caller, body) {
 /** La app pregunta si ya se pagó. Aquí se confirma el pago con Stripe o ATH. */
 async function status(db, caller, body) {
   const { ref, b, secretRef, secret } = await load(db, body.bookingId);
-  if (b.clientUid !== caller.uid && b.artistId !== caller.uid) throw new Fail(403, 'Esta reserva no es tuya');
+  if (b.clientUid !== caller.uid && !isArtistOf(b, caller.uid)) throw new Fail(403, 'Esta reserva no es tuya');
   if (b.payment !== 'porPagar') return { payment: b.payment };
 
   if (secret.method === 'tarjeta' && secret.stripeSession) {
@@ -323,22 +385,30 @@ async function release(b, secret) {
   return 'liberado';
 }
 
-/** El artista acepta o rechaza; el cliente cancela antes de que responda. */
+/**
+ * El artista acepta (confirma la fecha, con el precio acordado si lo pone) o
+ * dice que no; el cliente cancela o no acepta el precio.
+ */
 async function decide(db, caller, body) {
   const { ref, b, secretRef, secret } = await load(db, body.bookingId);
   const action = body.action;
-  const isArtist = b.artistId === caller.uid;
+  const isArtist = isArtistOf(b, caller.uid);
   const isClient = b.clientUid === caller.uid;
   if ((action === 'cancel' && !isClient) || (action !== 'cancel' && !isArtist)) {
     throw new Fail(403, 'No puedes hacer eso con esta reserva');
   }
-  if (b.status !== 'pendiente') throw new Fail(409, 'Esta reserva ya fue respondida');
+  if (!OPEN.includes(b.status)) throw new Fail(409, 'Esta reserva ya fue respondida');
 
   if (action === 'accept') {
     if (b.payment === 'sinPago') {
-      await ref.update({ status: 'confirmada' });
-      return { status: 'confirmada', payment: 'sinPago' };
+      const price = parsePrice(body.price, false);
+      const changes = { status: 'confirmada' };
+      if (price !== null) Object.assign(changes, { quotePrice: price, total: price });
+      await ref.update(changes);
+      await holdTime(db, ref, b);
+      return { ...changes, payment: 'sinPago' };
     }
+    if (b.status !== 'pendiente') throw new Fail(409, 'Esta reserva ya fue respondida');
     if (!['retenido', 'pagado'].includes(b.payment)) throw new Fail(409, 'El cliente todavía no ha pagado');
     if (secret.method === 'tarjeta' && secret.stripeIntent) {
       try {
@@ -349,6 +419,7 @@ async function decide(db, caller, body) {
     }
     await ref.update({ status: 'confirmada', payment: 'cobrado' });
     await secretRef.set({ capturedAt: Date.now() }, { merge: true });
+    await holdTime(db, ref, b);
     return { status: 'confirmada', payment: 'cobrado' };
   }
 
@@ -357,6 +428,33 @@ async function decide(db, caller, body) {
   await ref.update({ status: st, payment });
   await db.collection('busy').doc(ref.id).delete();
   return { status: st, payment };
+}
+
+/** El artista responde la solicitud con su precio (o lo cambia). */
+async function quote(db, caller, body) {
+  const { ref, b } = await load(db, body.bookingId);
+  if (!isArtistOf(b, caller.uid)) throw new Fail(403, 'Esta solicitud no es tuya');
+  if (!OPEN.includes(b.status)) throw new Fail(409, 'Esta solicitud ya no está abierta');
+  if (b.payment !== 'sinPago') throw new Fail(409, 'Esta reserva ya tiene precio');
+  const price = parsePrice(body.price, true);
+  const note = String(body.note || '').trim().slice(0, 300);
+  const changes = { status: 'cotizada', quotePrice: price, quoteNote: note, total: price };
+  await ref.update(changes);
+  return { ...changes, payment: b.payment };
+}
+
+/** El cliente acepta el precio: la fecha queda reservada si sigue libre. */
+async function acceptQuote(db, caller, body) {
+  const { ref, b } = await load(db, body.bookingId);
+  if (b.clientUid !== caller.uid) throw new Fail(403, 'Esta solicitud no es tuya');
+  if (b.status !== 'cotizada') throw new Fail(409, 'Esta cotización ya no está abierta');
+  if (await conflicts(db, ref.id, b)) {
+    throw new Fail(409, 'El artista ya tiene otra reserva a esa hora. Escríbele para buscar otra fecha.');
+  }
+  const changes = { status: 'confirmada', total: Number(b.quotePrice) || 0 };
+  await ref.update(changes);
+  await holdTime(db, ref, b);
+  return { ...changes, payment: b.payment };
 }
 
 // ---------- Entrada ----------
@@ -416,6 +514,10 @@ module.exports = async (req, res) => {
       case 'reject':
       case 'cancel':
         return res.json(await decide(db, caller, body));
+      case 'quote':
+        return res.json(await quote(db, caller, body));
+      case 'acceptQuote':
+        return res.json(await acceptQuote(db, caller, body));
       default:
         return res.status(400).json({ error: 'Acción no válida' });
     }
@@ -425,3 +527,4 @@ module.exports = async (req, res) => {
 };
 
 module.exports.amounts = amounts;
+module.exports.ownerOf = ownerOf;

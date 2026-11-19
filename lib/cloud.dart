@@ -17,14 +17,17 @@ import 'places.dart' show matchMunicipio;
 ///
 /// Colecciones:
 /// - users/{uid}: datos de la cuenta.
-/// - artists/{uid}: página pública del artista.
+/// - artists/{uid} y artists/{uid}__{n}: páginas públicas (perfiles) del
+///   artista. Una cuenta puede tener varias; ownerUid dice de quién son.
 /// - busy/{bookingId}: horas ocupadas, sin datos del cliente, para que
 ///   cualquiera vea qué horas quedan libres.
-/// - bookings/{id}: reservas; las leen solo el cliente y el artista.
+/// - bookings/{id}: solicitudes de cotización y reservas; las leen solo el
+///   cliente y el artista (artistUid es la cuenta dueña del perfil).
 /// - conversations/{artistId__clientUid}: chat con sus mensajes.
 /// - notifications/{id}: avisos para cada persona.
-/// - subscriptions/{uid}: suscripción del artista (solo la escribe el
-///   servidor); todos la leen para saber qué artistas aparecen.
+/// - subscriptions/{uid}: membresía de la cuenta del artista (solo la
+///   escribe el servidor); cubre todos sus perfiles. Todos la leen para
+///   saber qué artistas aparecen.
 /// - reviews/{bookingId}: reseñas y estrellas que dejan los clientes.
 class Cloud {
   Cloud._(this.state);
@@ -33,7 +36,7 @@ class Cloud {
   final _auth = FirebaseAuth.instance;
   final _db = FirebaseFirestore.instance;
   final _private = <StreamSubscription<Object?>>[];
-  Timer? _saveTimer;
+  final _saveTimers = <String, Timer>{};
 
   String? get uid => _auth.currentUser?.uid;
 
@@ -80,6 +83,7 @@ class Cloud {
       if (artist != null) {
         artist
           ..id = id
+          ..ownerUid = id
           ..email = email
           ..createdAt = DateTime.now();
         await _col('artists').doc(id).set(artistToMap(artist));
@@ -131,7 +135,9 @@ class Cloud {
       );
       final id = user.uid;
       _cancelPrivate();
-      if (state.isArtist) await _col('artists').doc(id).delete();
+      for (final p in state.myProfiles.reversed) {
+        await _col('artists').doc(p.id).delete();
+      }
       await _col('users').doc(id).delete();
       await user.delete();
       return null;
@@ -147,15 +153,33 @@ class Cloud {
     final doc = await _col('users').doc(id).get();
     final data = doc.data();
     if (data == null) throw StateError('Cuenta sin datos');
-    Artist? artist;
+    final profiles = <Artist>[];
     if (data['role'] == UserRole.artista.name) {
-      artist = state.artists.where((a) => a.id == id).firstOrNull;
-      if (artist == null) {
-        final a = await _col('artists').doc(id).get();
-        artist = artistFromMap(id, a.data() ?? {});
+      Artist load(String docId, Map<String, dynamic> d) =>
+          state.artists.where((a) => a.id == docId).firstOrNull ??
+          artistFromMap(docId, d);
+      final main = await _col('artists').doc(id).get();
+      profiles.add(load(id, main.data() ?? {}));
+      // Los demás perfiles de la cuenta (agrupación, músico independiente…).
+      final extra = await _col('artists')
+          .where('ownerUid', isEqualTo: id)
+          .get();
+      final others = extra.docs.where((d) => d.id != id).toList()
+        ..sort((a, b) => a.id.compareTo(b.id));
+      for (final d in others) {
+        profiles.add(load(d.id, d.data()));
       }
     }
-    state.signIn(accountFromMap(data, artist));
+    final artist = profiles.firstOrNull;
+    final account = accountFromMap(data, artist);
+    account.profiles
+      ..clear()
+      ..addAll(profiles);
+    // Todos los perfiles están en el mismo pueblo que la cuenta.
+    for (final p in profiles) {
+      if (account.town.isNotEmpty) p.zone = account.town;
+    }
+    state.signIn(account);
     _listenPrivate();
     if (artist != null) unawaited(refreshSubscription().catchError((_) {}));
   }
@@ -174,8 +198,8 @@ class Cloud {
         final existing = state.artists.where((a) => a.id == doc.id).firstOrNull;
         if (existing == null) {
           state.artists.add(artistFromMap(doc.id, doc.data()));
-        } else if (doc.id != uid) {
-          // Mi propia página no se pisa: la estoy editando aquí.
+        } else if (ownerOfArtistId(doc.id) != uid) {
+          // Mis propias páginas no se pisan: las estoy editando aquí.
           applyArtistMap(existing, doc.data());
         }
       }
@@ -203,8 +227,12 @@ class Cloud {
       }
       for (final doc in snap.docs) {
         final d = doc.data();
-        final a = state.artists.where((x) => x.id == d['artistId']).firstOrNull;
-        a?.busy.add((_date(d['start']), _date(d['end'])));
+        // La persona no puede estar en dos sitios: una hora ocupada en un
+        // perfil también lo está en sus otros perfiles.
+        final owner = ownerOfArtistId('${d['artistId'] ?? ''}');
+        for (final a in state.artists.where((x) => x.ownerUid == owner)) {
+          a.busy.add((_date(d['start']), _date(d['end'])));
+        }
       }
       state.cloudChanged();
     }, onError: _ignore);
@@ -215,7 +243,8 @@ class Cloud {
 
   void _applySubscriptions() {
     for (final a in state.artists) {
-      a.subscription = _subscriptions[a.id] ?? a.subscription;
+      // La membresía es de la cuenta y cubre todos sus perfiles.
+      a.subscription = _subscriptions[a.ownerUid] ?? a.subscription;
     }
   }
 
@@ -233,7 +262,9 @@ class Cloud {
     final id = uid;
     final email = _auth.currentUser?.email?.toLowerCase();
     if (id == null) return;
-    for (final field in ['artistId', 'clientUid']) {
+    // artistUid: solicitudes a cualquiera de mis perfiles. artistId: las
+    // viejas, de antes de que existieran los perfiles.
+    for (final field in ['artistId', 'artistUid', 'clientUid']) {
       _private.add(
         _col('bookings').where(field, isEqualTo: id).snapshots().listen((s) {
           for (final doc in s.docs) {
@@ -310,7 +341,9 @@ class Cloud {
         payDeposit: d['payDeposit'] ?? true,
         noDeposit: d['noDeposit'] == true,
         cardLast4: d['cardLast4'] ?? '',
-        status: BookingStatus.values.byName(d['status']),
+        quotePrice: (d['quotePrice'] as num?)?.toDouble(),
+        quoteNote: d['quoteNote'] ?? '',
+        status: _status(d['status']),
         payment: PaymentStatus.values.byName(d['payment']),
         paymentMethod: _method(d['paymentMethod']),
       ),
@@ -320,14 +353,20 @@ class Cloud {
   /// Lo que el servidor de pagos cambia en una reserva.
   static void _applyPayment(Booking b, Map<String, dynamic> d) {
     b
-      ..status = BookingStatus.values.byName(d['status'] ?? b.status.name)
+      ..status = _status(d['status'] ?? b.status.name)
       ..payment = PaymentStatus.values.byName(d['payment'] ?? b.payment.name)
       ..paymentMethod = _method(d['paymentMethod'] ?? b.paymentMethod.name)
       ..cardLast4 = d['cardLast4'] ?? b.cardLast4
+      ..quotePrice = (d['quotePrice'] as num?)?.toDouble() ?? b.quotePrice
+      ..quoteNote = d['quoteNote'] ?? b.quoteNote
       ..total = (d['total'] as num?)?.toDouble() ?? b.total
       ..amountCharged =
           (d['amountCharged'] as num?)?.toDouble() ?? b.amountCharged;
   }
+
+  static BookingStatus _status(Object? name) =>
+      BookingStatus.values.where((s) => s.name == name).firstOrNull ??
+      BookingStatus.pendiente;
 
   static PaymentMethod _method(Object? name) =>
       PaymentMethod.values.where((m) => m.name == name).firstOrNull ??
@@ -382,19 +421,32 @@ class Cloud {
 
   // ---------- Guardar ----------
 
-  /// Guarda la página del artista. Espera un momento para no escribir con
-  /// cada letra que se teclea.
-  void saveArtist(Artist a) {
-    if (a.id != uid) return;
-    _saveTimer?.cancel();
-    _saveTimer = Timer(const Duration(milliseconds: 800), () {
-      _col('artists').doc(a.id).set(artistToMap(a));
-    });
+  /// Guarda una página del artista. Espera un momento para no escribir con
+  /// cada letra que se teclea ([now] la guarda enseguida).
+  void saveArtist(Artist a, {bool now = false}) {
+    if (uid == null || a.ownerUid != uid) return;
+    a.ownerUid = uid!;
+    _saveTimers.remove(a.id)?.cancel();
+    void save() =>
+        _col('artists').doc(a.id).set(artistToMap(a)).catchError(_ignore);
+    if (now) {
+      save();
+    } else {
+      _saveTimers[a.id] = Timer(const Duration(milliseconds: 800), save);
+    }
+  }
+
+  /// Borra un perfil extra (nunca el principal, que tiene el id de la cuenta).
+  Future<void> deleteProfile(Artist a) async {
+    if (a.id == uid || a.ownerUid != uid) return;
+    _saveTimers.remove(a.id)?.cancel();
+    await _col('artists').doc(a.id).delete();
   }
 
   Future<void> saveBooking(Booking b) async {
     final saved = _col('bookings').doc(b.id).set({
       'artistId': b.artist.id,
+      'artistUid': b.artist.ownerUid,
       'artistName': b.artist.name,
       'package': b.package,
       'eventType': b.eventType.name,
@@ -411,6 +463,8 @@ class Cloud {
       'payDeposit': b.payDeposit,
       'noDeposit': b.noDeposit,
       'cardLast4': b.cardLast4,
+      'quotePrice': b.quotePrice,
+      'quoteNote': b.quoteNote,
       'status': b.status.name,
       'payment': b.payment.name,
       'paymentMethod': b.paymentMethod.name,
@@ -419,12 +473,14 @@ class Cloud {
     if (b.blocksSchedule) {
       busy.set({
         'artistId': b.artist.id,
+        'artistUid': b.artist.ownerUid,
         'clientUid': b.clientUid,
         'start': b.start.millisecondsSinceEpoch,
         'end': b.end.millisecondsSinceEpoch,
       });
-    } else {
-      busy.delete();
+    } else if (b.status != BookingStatus.pendiente) {
+      // Una solicitud nueva todavía no tiene hora apartada.
+      busy.delete().catchError(_ignore);
     }
     await saved;
   }
@@ -434,6 +490,7 @@ class Cloud {
   void sendMessage(Conversation c, ChatMessage m) {
     _col('conversations').doc(c.id).set({
       'artistId': c.artist.id,
+      'artistUid': c.artist.ownerUid,
       'clientUid': c.clientUid,
       'clientEmail': c.clientEmail.toLowerCase(),
       'clientName': c.clientName,
@@ -760,6 +817,7 @@ Map<String, dynamic> artistToMap(Artist a) {
   }
 
   return {
+    'ownerUid': a.ownerUid,
     'name': a.name,
     'category': a.category.name,
     'genres': a.genres,
@@ -774,16 +832,10 @@ Map<String, dynamic> artistToMap(Artist a) {
     if (a.createdAt != null) 'createdAt': a.createdAt!.millisecondsSinceEpoch,
     'bufferMinutes': a.bufferMinutes,
     'eventTypes': [for (final e in a.eventTypes) e.name],
-    'packages': [
-      for (final p in a.packages)
-        {
-          'name': p.name,
-          'price': p.price,
-          'hours': p.hours,
-          'description': p.description,
-          'kind': p.kind.name,
-        },
-    ],
+    // Ya no hay paquetes con precio fijo: todo se cotiza. priceFrom es un
+    // precio de referencia opcional.
+    'priceFrom': a.priceFrom,
+    'whatsapp': a.whatsapp,
     'links': [
       for (final l in a.links)
         {'kind': l.kind.name, 'title': l.title, 'url': l.url},
@@ -811,7 +863,6 @@ Artist artistFromMap(String id, Map<String, dynamic> d) {
     rating: 0,
     reviews: 0,
     color: const Color(0xFF6A1B9A),
-    packages: [],
     links: [],
     eventTypes: {},
   );
@@ -826,7 +877,12 @@ void applyArtistMap(Artist a, Map<String, dynamic> d) {
   Uint8List? bytes(Object? v) => v is String ? base64Decode(v) : null;
 
   a
+    // El dueño sale del id (las reglas de Firestore no dejan que otra
+    // cuenta escriba ese id).
+    ..ownerUid = ownerOfArtistId(a.id)
     ..name = d['name'] ?? a.name
+    ..priceFrom = (d['priceFrom'] as num?)?.toDouble()
+    ..whatsapp = d['whatsapp'] as String? ?? ''
     ..zone = matchMunicipio(d['pueblo'] as String?) ?? ''
     ..category = ArtistCategory.values.byName(d['category'] ?? 'solista')
     ..genres = strings(d['genres'])
@@ -843,20 +899,6 @@ void applyArtistMap(Artist a, Map<String, dynamic> d) {
     }
     ..photo = bytes(d['photo'])
     ..cover = bytes(d['cover']);
-  a.packages
-    ..clear()
-    ..addAll([
-      for (final p in (d['packages'] as List? ?? []).cast<Map>())
-        PricePackage(
-          name: p['name'] ?? '',
-          price: (p['price'] as num).toDouble(),
-          hours: (p['hours'] as num).toDouble(),
-          description: p['description'] ?? '',
-          kind: p['kind'] == PackageKind.restaurante.name
-              ? PackageKind.restaurante
-              : PackageKind.actividad,
-        ),
-    ]);
   a.links
     ..clear()
     ..addAll([

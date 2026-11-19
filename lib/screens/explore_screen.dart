@@ -39,8 +39,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
     bool local(Artist a) => myTown.isNotEmpty && a.zone == myTown;
     final list =
         state.artists.where((a) {
-          // Un artista aparece cuando ya publicó al menos un precio y está
-          // suscrito (o en su mes gratis).
+          // Un perfil aparece mientras la membresía de su cuenta esté activa
+          // (o en su mes gratis). Cada perfil de una cuenta sale aparte.
           if (!a.listed) return false;
           if (_category != null && a.category != _category) return false;
           if (_instrument != null && !a.instruments.contains(_instrument)) {
@@ -58,7 +58,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
           return switch (_sort) {
             SortBy.recomendados ||
             SortBy.valoracion => b.rating.compareTo(a.rating),
-            SortBy.precio => a.minPrice.compareTo(b.minPrice),
+            // Los que muestran un precio de referencia van primero.
+            SortBy.precio => (a.priceFrom ?? double.infinity).compareTo(
+              b.priceFrom ?? double.infinity,
+            ),
           };
         });
     final localCount = list.where(local).length;
@@ -263,7 +266,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     ),
                   ),
                 ),
-                final Artist a when a == me => Column(
+                final Artist a when me != null && state.isMine(a) => Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Padding(
@@ -302,8 +305,8 @@ class MyListingStatus extends StatelessWidget {
     final text = listed
         ? 'Estás apareciendo en la app. Los clientes te encuentran aquí '
               'mientras tu membresía esté activa.'
-        : artist.packages.isEmpty
-        ? 'Todavía no apareces: añade al menos un precio en Solicitudes.'
+        : artist.name.isEmpty
+        ? 'Todavía no apareces: ponle nombre a tu página en Mi página.'
         : 'No apareces en la app porque tu membresía no está activa. '
               'Actívala en Solicitudes para que los clientes te vean.';
     return Container(
@@ -399,14 +402,16 @@ class ArtistCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    'desde',
+                    artist.priceFrom == null ? 'precio' : 'desde',
                     style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                   ),
                   Text(
-                    money(artist.minPrice),
+                    artist.priceFrom == null
+                        ? 'Cotizar'
+                        : money(artist.priceFrom!),
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      fontSize: 18,
+                      fontSize: artist.priceFrom == null ? 14 : 18,
                       color: scheme.primary,
                     ),
                   ),
@@ -572,8 +577,8 @@ class _NeonArtistCard extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          const Text(
-                            'DESDE',
+                          Text(
+                            artist.priceFrom == null ? 'PRECIO' : 'DESDE',
                             style: TextStyle(
                               fontSize: 10,
                               letterSpacing: 1.5,
@@ -581,11 +586,13 @@ class _NeonArtistCard extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            money(artist.minPrice),
-                            style: const TextStyle(
+                            artist.priceFrom == null
+                                ? 'COTIZAR'
+                                : money(artist.priceFrom!),
+                            style: TextStyle(
                               fontFamily: 'Orbitron',
                               fontWeight: FontWeight.w800,
-                              fontSize: 18,
+                              fontSize: artist.priceFrom == null ? 13 : 18,
                               color: NeonColors.cyan,
                             ),
                           ),

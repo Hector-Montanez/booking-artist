@@ -24,7 +24,6 @@ void main() {
     final booking = Booking(
       id: '1',
       artist: sofia,
-      package: sofia.packages.first.name,
       eventType: EventType.restaurante,
       date: DateTime(2026, 11, 14),
       time: const TimeOfDay(hour: 19, minute: 0),
@@ -33,12 +32,12 @@ void main() {
       clientType: client.clientType,
       clientEmail: client.email,
       notes: '',
-      total: 194.4,
-      amountCharged: 58,
-      payDeposit: true,
-      cardLast4: '4242',
+      total: 0,
+      amountCharged: 0,
+      payDeposit: false,
+      cardLast4: '',
     );
-    state.addBooking(booking);
+    state.requestQuote(booking);
     final chat = state.conversationWith(
       artist: sofia,
       clientEmail: client.email,
@@ -51,19 +50,19 @@ void main() {
     state.signIn(artistAccount);
     expect(state.unreadNotifications, 2);
     final request = state.myNotifications.last;
-    expect(request.title, 'Nueva solicitud de reserva');
+    expect(request.title, 'Nueva solicitud de cotización');
     expect(request.byEmail, isTrue);
     expect(state.unreadMessages, 1);
 
     state.sendMessage(chat, '¡Claro que sí!');
-    state.acceptBooking(booking);
+    state.sendQuote(booking, 200, '');
 
     // El restaurante ve la respuesta y la confirmación.
     state.signIn(client);
     expect(state.unreadMessages, 1);
     expect(
       state.myNotifications.map((n) => n.title),
-      contains('Sofía Rivera aceptó tu reserva'),
+      contains('Sofía Rivera te envió su precio'),
     );
     expect(chat.messages.map((m) => m.fromArtist), [false, true]);
   });

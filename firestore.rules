@@ -6,25 +6,30 @@ service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
     function me() { return request.auth.uid; }
+    // Una cuenta de artista puede tener varias páginas (perfiles): la
+    // primera tiene el id de la cuenta y las demás "<cuenta>__<n>".
+    function ownerOf(artistId) { return artistId.split('__')[0]; }
 
     // Datos de la cuenta: solo su dueño.
     match /users/{uid} {
       allow read, write: if signedIn() && me() == uid;
     }
 
-    // Página pública del artista: todos la ven, solo el artista la cambia.
-    // createdAt (desde cuándo cuenta su mes gratis) se pone al crear la
-    // página y no se puede cambiar después.
+    // Páginas públicas del artista: todos las ven, solo la cuenta dueña las
+    // cambia. createdAt (desde cuándo cuenta su mes gratis) se pone al crear
+    // la página y no se puede cambiar después.
     match /artists/{uid} {
       allow read: if true;
-      allow create: if signedIn() && me() == uid &&
+      allow create: if signedIn() && me() == ownerOf(uid) &&
+        request.resource.data.get('ownerUid', me()) == me() &&
         (!('createdAt' in request.resource.data) ||
          (request.resource.data.createdAt is int &&
           request.resource.data.createdAt > request.time.toMillis() - 600000 &&
           request.resource.data.createdAt < request.time.toMillis() + 600000));
-      allow update: if signedIn() && me() == uid &&
+      allow update: if signedIn() && me() == ownerOf(uid) &&
+        request.resource.data.get('ownerUid', me()) == me() &&
         request.resource.data.get('createdAt', 0) == resource.data.get('createdAt', 0);
-      allow delete: if signedIn() && me() == uid;
+      allow delete: if signedIn() && me() == ownerOf(uid);
     }
 
     // Suscripción de $10 al mes de cada artista: todos la leen (para saber
@@ -40,23 +45,30 @@ service cloud.firestore {
     }
 
     // Horas ocupadas (sin datos del cliente), para mostrar horarios libres.
+    // Solo las reservas confirmadas ocupan hora (pedir cotización no).
     match /busy/{bookingId} {
       allow read: if true;
-      allow create: if signedIn() && request.resource.data.clientUid == me();
+      allow create: if signedIn() &&
+        (request.resource.data.clientUid == me() ||
+         ownerOf(request.resource.data.artistId) == me());
       allow update, delete: if signedIn() &&
-        (resource.data.clientUid == me() || resource.data.artistId == me());
+        (resource.data.clientUid == me() || resource.data.artistId == me() ||
+         resource.data.artistUid == me());
     }
 
-    // Reservas: solo el cliente que la hizo y el artista reservado.
-    // Una reserva nueva empieza sin pagar (porPagar). El pago, el monto y el
-    // estado de las reservas con cobro real solo los cambia el servidor de
-    // pagos (/api/pay). Las de pago simulado se pueden cambiar desde la app.
+    // Solicitudes de cotización y reservas: solo el cliente que la hizo y la
+    // cuenta del artista (artistUid; artistId en las viejas). Una nueva
+    // empieza sin pagar (porPagar). El precio, el estado y el pago solo los
+    // cambia el servidor (/api/pay). Las simuladas se cambian desde la app.
     function party() {
-      return resource.data.clientUid == me() || resource.data.artistId == me();
+      return resource.data.clientUid == me() || resource.data.artistId == me() ||
+        resource.data.artistUid == me();
     }
     match /bookings/{id} {
       allow create: if signedIn() && request.resource.data.clientUid == me() &&
         request.resource.data.status == 'pendiente' &&
+        request.resource.data.get('artistUid', ownerOf(request.resource.data.artistId)) ==
+          ownerOf(request.resource.data.artistId) &&
         request.resource.data.payment in ['porPagar', 'simulado'];
       allow read: if signedIn() && party();
       allow update: if signedIn() && party() &&
@@ -90,10 +102,13 @@ service cloud.firestore {
     // Chats: solo las dos personas de la conversación.
     match /conversations/{id} {
       allow read, update: if signedIn() &&
-        (resource.data.clientUid == me() || resource.data.artistId == me());
+        (resource.data.clientUid == me() || resource.data.artistId == me() ||
+         resource.data.artistUid == me());
       allow create: if signedIn() &&
+        request.resource.data.get('artistUid', ownerOf(request.resource.data.artistId)) ==
+          ownerOf(request.resource.data.artistId) &&
         (request.resource.data.clientUid == me() ||
-         request.resource.data.artistId == me());
+         ownerOf(request.resource.data.artistId) == me());
     }
 
     // Avisos: cualquiera con cuenta puede enviar; solo el destinatario los lee.

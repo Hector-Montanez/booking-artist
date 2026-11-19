@@ -9,7 +9,7 @@ import 'package:intl/date_symbol_data_local.dart';
 Booking _booking(Artist a) => Booking(
   id: '1',
   artist: a,
-  package: a.packages.first.name,
+  package: 'Toque con agrupación',
   eventType: EventType.conAgrupacion,
   date: DateTime(2026, 12, 20),
   time: const TimeOfDay(hour: 20, minute: 0),
@@ -42,6 +42,114 @@ void main() {
     state.rejectBooking(rejected);
     expect(rejected.status, BookingStatus.rechazada);
     expect(rejected.payment, PaymentStatus.liberado);
+  });
+
+  Booking quote(Artist a, {String id = 'q1', int hour = 20}) => Booking(
+    id: id,
+    artist: a,
+    eventType: EventType.boda,
+    date: DateTime(2030, 6, 1),
+    time: TimeOfDay(hour: hour, minute: 0),
+    hours: 2,
+    venue: 'Hacienda Siesta Alegre, Cayey',
+    clientName: 'Boda Rivera-Cruz',
+    clientEmail: 'novios@ejemplo.com',
+    notes: '120 invitados',
+    total: 0,
+    amountCharged: 0,
+    payDeposit: false,
+    cardLast4: '',
+  );
+
+  test(
+    'cotización: el artista envía su precio y el cliente lo acepta',
+    () async {
+      final state = AppState();
+      final sofia = state.artists.firstWhere((a) => a.id == 'a1');
+      final b = quote(sofia);
+      expect(b.isQuote, isTrue);
+      expect(await state.requestQuote(b), isNull);
+      expect(b.status, BookingStatus.pendiente);
+      expect(b.payment, PaymentStatus.sinPago);
+      expect(b.blocksSchedule, isFalse, reason: 'pedir precio no aparta');
+      expect(state.notifications.first.title, 'Nueva solicitud de cotización');
+
+      expect(await state.sendQuote(b, 450, 'Incluye sonido'), isNull);
+      expect(b.status, BookingStatus.cotizada);
+      expect(b.quotePrice, 450);
+      expect(b.quoteNote, 'Incluye sonido');
+      expect(state.notifications.first.recipientEmail, 'novios@ejemplo.com');
+      expect(state.notifications.first.title, contains('te envió su precio'));
+
+      // El artista puede cambiar el precio antes de que el cliente acepte.
+      expect(await state.sendQuote(b, 420, ''), isNull);
+      expect(b.quotePrice, 420);
+
+      expect(await state.acceptQuote(b), isNull);
+      expect(b.status, BookingStatus.confirmada);
+      expect(b.total, 420);
+      expect(b.blocksSchedule, isTrue);
+      expect(state.notifications.first.recipientEmail, sofia.email);
+      expect(await state.acceptQuote(b), isNotNull, reason: 'ya está cerrada');
+    },
+  );
+
+  test('el cliente puede decir que no al precio', () async {
+    final state = AppState();
+    final sofia = state.artists.firstWhere((a) => a.id == 'a1');
+    final b = quote(sofia);
+    await state.requestQuote(b);
+    await state.sendQuote(b, 900, '');
+    expect(await state.cancelBooking(b), isNull);
+    expect(b.status, BookingStatus.cancelada);
+    expect(state.notifications.first.title, contains('no aceptó tu precio'));
+  });
+
+  test(
+    'el artista puede confirmar directo lo que acordaron por WhatsApp',
+    () async {
+      final state = AppState();
+      final sofia = state.artists.firstWhere((a) => a.id == 'a1');
+      final b = quote(sofia);
+      await state.requestQuote(b);
+      expect(await state.acceptBooking(b, price: 300), isNull);
+      expect(b.status, BookingStatus.confirmada);
+      expect(b.total, 300);
+    },
+  );
+
+  test(
+    'dos clientes piden la misma hora: el segundo no puede aceptar',
+    () async {
+      final state = AppState();
+      final sofia = state.artists.firstWhere((a) => a.id == 'a1');
+      // El trío es otro perfil de Sofía: tampoco puede tocar a esa hora.
+      final trio = state.artists.firstWhere((a) => a.id == 'a1__2');
+      final first = quote(sofia, id: 'q1');
+      final second = quote(trio, id: 'q2', hour: 21);
+      await state.requestQuote(first);
+      await state.requestQuote(second);
+      await state.sendQuote(first, 400, '');
+      await state.sendQuote(second, 600, '');
+      expect(await state.acceptQuote(first), isNull);
+      expect(await state.acceptQuote(second), contains('otra reserva'));
+      expect(second.status, BookingStatus.cotizada);
+    },
+  );
+
+  test('el enlace de WhatsApp lleva el número de PR con el 1', () {
+    expect(whatsappDigits('(787) 555-0202'), '17875550202');
+    expect(whatsappDigits('+1 787 555 0202'), '17875550202');
+    final state = AppState();
+    final sofia = state.artists.firstWhere((a) => a.id == 'a1');
+    expect(sofia.hasWhatsapp, isTrue);
+    final text = quoteWhatsappText(
+      artist: sofia,
+      eventType: EventType.boda,
+      when: ' el sábado',
+    );
+    expect(text, contains('una boda el sábado'));
+    expect(text, contains('¿Cuánto cobrarías?'));
   });
 
   test('se pueden contratar payasos', () {

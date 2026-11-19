@@ -25,7 +25,6 @@ class AppState extends ChangeNotifier {
       Booking(
         id: 'seed-pasada',
         artist: sofia,
-        package: sofia.packages.first.name,
         eventType: EventType.restaurante,
         date: DateTime(past.year, past.month, past.day),
         time: const TimeOfDay(hour: 19, minute: 0),
@@ -34,7 +33,8 @@ class AppState extends ChangeNotifier {
         clientType: ClientType.restaurante,
         clientEmail: demoClientEmail,
         notes: '',
-        total: sofia.packages.first.price,
+        total: 180,
+        quotePrice: 180,
         amountCharged: 0,
         payDeposit: false,
         noDeposit: true,
@@ -42,7 +42,36 @@ class AppState extends ChangeNotifier {
         status: BookingStatus.confirmada,
         payment: PaymentStatus.sinPago,
         paymentMethod: PaymentMethod.ninguno,
-        hours: sofia.packages.first.hours,
+        hours: 2,
+      ),
+    );
+    // Una cotización que el trío de Sofía ya respondió, para probar
+    // "Aceptar precio" como Restaurante El Patio.
+    final trio = artists.firstWhere((a) => a.id == 'a1__2');
+    final soon = DateTime.now().add(const Duration(days: 20));
+    bookings.add(
+      Booking(
+        id: 'seed-cotizada',
+        artist: trio,
+        eventType: EventType.actividad,
+        date: DateTime(soon.year, soon.month, soon.day),
+        time: const TimeOfDay(hour: 19, minute: 0),
+        venue: 'Restaurante El Patio, Calle Ruiz Belvis 10',
+        clientName: 'Restaurante El Patio',
+        clientType: ClientType.restaurante,
+        clientEmail: demoClientEmail,
+        notes: 'Aniversario del restaurante, unas 80 personas.',
+        total: 350,
+        quotePrice: 350,
+        quoteNote: 'Incluye sonido para el patio y 3 sets de 45 minutos.',
+        amountCharged: 0,
+        payDeposit: false,
+        noDeposit: true,
+        cardLast4: '',
+        status: BookingStatus.cotizada,
+        payment: PaymentStatus.sinPago,
+        paymentMethod: PaymentMethod.ninguno,
+        hours: 3,
       ),
     );
     accounts.addAll([
@@ -62,7 +91,7 @@ class AppState extends ChangeNotifier {
         name: 'Sofía Rivera',
         email: demoArtistEmail,
         phone: '787 555 0202',
-        artist: sofia,
+        profiles: [sofia, trio],
         password: demoPassword,
       ),
     ]);
@@ -90,7 +119,6 @@ class AppState extends ChangeNotifier {
     ]) => Booking(
       id: 'seed-${day.day}-$hour',
       artist: sofia,
-      package: sofia.packages.first.name,
       eventType: type,
       date: day,
       time: TimeOfDay(hour: hour, minute: 0),
@@ -98,13 +126,16 @@ class AppState extends ChangeNotifier {
       clientName: client,
       clientType: clientType,
       notes: '',
-      total: 194,
-      amountCharged: 194,
+      total: 200,
+      quotePrice: 200,
+      amountCharged: 0,
       payDeposit: false,
-      cardLast4: '1881',
+      noDeposit: true,
+      cardLast4: '',
       status: BookingStatus.confirmada,
-      payment: PaymentStatus.cobrado,
-      hours: sofia.packages.first.hours,
+      payment: PaymentStatus.sinPago,
+      paymentMethod: PaymentMethod.ninguno,
+      hours: 2,
     );
     bookings.addAll([
       seed(next(DateTime.saturday), 19, 'Boda Rodríguez-Colón', EventType.boda),
@@ -226,7 +257,7 @@ class AppState extends ChangeNotifier {
     final list = conversations
         .where(
           (c) => isArtist
-              ? c.artist == myArtistProfile
+              ? isMine(c.artist)
               : c.clientEmail.toLowerCase() == a.email.toLowerCase(),
         )
         .toList();
@@ -297,19 +328,103 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Página del artista que tiene la sesión abierta.
-  Artist get myArtistProfile =>
-      account?.artist ?? artists.firstWhere((a) => a.id == 'a1');
+  /// Perfil (página) del artista que está editando ahora. Una cuenta de
+  /// artista puede tener varios.
+  Artist get myArtistProfile {
+    final mine = myProfiles;
+    if (mine.isEmpty) return artists.firstWhere((a) => a.id == 'a1');
+    return mine.contains(_activeProfile) ? _activeProfile! : mine.first;
+  }
+
+  Artist? _activeProfile;
+
+  /// Todas las páginas de la cuenta de artista con la sesión abierta.
+  List<Artist> get myProfiles => account?.profiles ?? const [];
+
+  /// La página es de la cuenta con la sesión abierta.
+  bool isMine(Artist a) => myProfiles.contains(a);
+
+  /// Cambia el perfil que se edita en Mi página.
+  void switchProfile(Artist a) {
+    if (!isMine(a)) return;
+    _activeProfile = a;
+    notifyListeners();
+  }
+
+  /// Crea otro perfil para la misma cuenta (p. ej. su agrupación). Copia el
+  /// pueblo, el horario, las condiciones y el WhatsApp del perfil actual; lo
+  /// demás se llena en Mi página. Lo cubre la misma membresía.
+  Artist createProfile({
+    required String name,
+    required ArtistCategory category,
+    List<String> instruments = const [],
+  }) {
+    final base = myArtistProfile;
+    final owner = base.ownerUid;
+    var n = myProfiles.length + 1;
+    String id() => '${owner}__$n';
+    while (artists.any((a) => a.id == id())) {
+      n++;
+    }
+    final a = Artist(
+      id: id(),
+      ownerUid: owner,
+      name: name,
+      category: category,
+      instruments: category.hasInstruments ? [...instruments] : [],
+      genres: [],
+      bio: '',
+      zone: base.zone,
+      distanceKm: 0,
+      rating: 0,
+      reviews: 0,
+      color: base.color,
+      links: [],
+      eventTypes: {...base.eventTypes},
+      conditions: base.conditions,
+      email: base.email,
+      whatsapp: base.whatsapp,
+      bufferMinutes: base.bufferMinutes,
+      weeklyHours: {...base.weeklyHours},
+      // La membresía es de la cuenta: el perfil nuevo no trae otro mes
+      // gratis.
+      subscription: base.subscription,
+    )..createdAt = cloud == null ? base.createdAt : null;
+    a.daysOff.addAll(base.daysOff);
+    account!.profiles.add(a);
+    artists.add(a);
+    _activeProfile = a;
+    cloud?.saveArtist(a, now: true);
+    notifyListeners();
+    return a;
+  }
+
+  /// Borra un perfil que no es el principal. Sus reservas pasadas se quedan.
+  Future<String?> deleteProfile(Artist a) async {
+    if (!isMine(a) || a == account?.artist) {
+      return 'El perfil principal no se puede borrar.';
+    }
+    try {
+      await cloud?.deleteProfile(a);
+    } catch (_) {
+      return 'No se pudo borrar el perfil. Revisa tu conexión.';
+    }
+    account!.profiles.remove(a);
+    artists.remove(a);
+    if (_activeProfile == a) _activeProfile = null;
+    notifyListeners();
+    return null;
+  }
 
   void signIn(Account a) {
     account = a;
+    _activeProfile = null;
     // Cada cuenta ve la app con el estilo que escogió.
     final style = AppStyle.fromName(a.theme);
     if (style != null) appStyle.value = style;
     if (!accounts.contains(a)) accounts.add(a);
-    if (a.artist != null && a.artist!.email.isEmpty) a.artist!.email = a.email;
-    final artist = a.artist;
-    if (artist != null) {
+    for (final artist in a.profiles) {
+      if (artist.email.isEmpty) artist.email = a.email;
       final i = artists.indexWhere((x) => x.id == artist.id);
       if (i < 0) {
         artists.add(artist);
@@ -334,7 +449,7 @@ class AppState extends ChangeNotifier {
       }
       accounts.remove(a);
     }
-    if (a.artist != null) artists.remove(a.artist);
+    artists.removeWhere(a.profiles.contains);
     signOut();
     return null;
   }
@@ -350,13 +465,12 @@ class AppState extends ChangeNotifier {
   /// La cuenta es de antes de pedir el pueblo y todavía no lo escogió.
   bool get needsTown => account != null && matchMunicipio(myTown) == null;
 
-  /// Guarda el pueblo en la cuenta (y en la página si es artista).
+  /// Guarda el pueblo en la cuenta (y en sus páginas si es artista).
   void setTown(String town) {
     final a = account;
     if (a == null) return;
     a.town = town;
-    final artist = a.artist;
-    if (artist != null) {
+    for (final artist in a.profiles) {
       artist.zone = town;
       cloud?.saveArtist(artist);
     }
@@ -390,9 +504,9 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Reserva con pago simulado (modo demo o servidor de pagos sin configurar):
-  /// se guarda y se avisa al artista enseguida. Las de restaurante quedan sin
-  /// pago (en la nube se marcan como simuladas para poder cambiarlas).
+  /// Solicitud guardada sin servidor de pagos (modo demo, o servidor sin
+  /// configurar): se guarda y se avisa al artista enseguida. En la nube se
+  /// marca como simulada para que las dos partes la puedan cambiar.
   void addBooking(Booking b) {
     if (online) {
       b.payment = PaymentStatus.simulado;
@@ -405,7 +519,7 @@ class AppState extends ChangeNotifier {
   }
 
   /// Reserva con cobro real: se guarda sin pagar y el servidor la marca como
-  /// pagada. Al artista se le avisa después, con [notifyArtist].
+  /// pagada. Se usará si algún día se encienden los pagos por la app.
   Future<void> createUnpaidBooking(Booking b) async {
     b.payment = PaymentStatus.porPagar;
     bookings.insert(0, b);
@@ -413,8 +527,8 @@ class AppState extends ChangeNotifier {
     await cloud!.saveBooking(b);
   }
 
-  /// Reserva de un paquete de restaurante con el servidor de pagos activo: se
-  /// guarda y el servidor comprueba que de verdad no lleva depósito.
+  /// Solicitud sin pago con el servidor activo: se guarda y el servidor la
+  /// pasa al artista sin cobrar nada.
   Future<String?> bookWithoutDeposit(Booking b) async {
     try {
       await createUnpaidBooking(b);
@@ -424,8 +538,25 @@ class AppState extends ChangeNotifier {
       unawaited(cancelBooking(b));
       return e.message;
     } catch (_) {
-      return 'No se pudo guardar la reserva. Intenta otra vez.';
+      return 'No se pudo guardar la solicitud. Intenta otra vez.';
     }
+  }
+
+  /// El cliente pide cotización: el artista recibe la solicitud (fecha,
+  /// evento, lugar y detalles) y responde con su precio. Por la app no se
+  /// paga nada. Devuelve un error o null.
+  Future<String?> requestQuote(Booking b) async {
+    b
+      ..noDeposit = true
+      ..paymentMethod = PaymentMethod.ninguno;
+    if (serverPayments) {
+      final error = await bookWithoutDeposit(b);
+      if (error != null) return error;
+      notifyArtist(b);
+    } else {
+      addBooking(b);
+    }
+    return null;
   }
 
   /// Le avisa al artista que tiene una solicitud nueva.
@@ -434,10 +565,15 @@ class AppState extends ChangeNotifier {
     notify(
       AppNotification(
         recipientEmail: b.artist.email,
-        title: 'Nueva solicitud de reserva',
-        body:
-            '${b.clientName} quiere reservarte el $when en ${b.venue} '
-            '(${b.package}). Acéptala o recházala en la app.',
+        title: b.isQuote
+            ? 'Nueva solicitud de cotización'
+            : 'Nueva solicitud de reserva',
+        body: b.isQuote
+            ? '${b.clientName} quiere saber tu precio para '
+                  '${b.eventType.label.toLowerCase()} el $when en ${b.venue} '
+                  '(${b.artist.name}). Envíale tu precio en la app.'
+            : '${b.clientName} quiere reservarte el $when en ${b.venue} '
+                  '(${b.package}). Acéptala o recházala en la app.',
         byEmail: true,
       ),
     );
@@ -455,70 +591,180 @@ class AppState extends ChangeNotifier {
     );
   }
 
-  /// Pide al servidor aceptar, rechazar o cancelar. Devuelve el error o null.
-  Future<String?> _decide(String action, Booking b) async {
+  /// Le pide al servidor un cambio de estado (aceptar, rechazar, cancelar,
+  /// enviar precio…). Devuelve el error o null.
+  Future<String?> _decide(
+    String action,
+    Booking b, [
+    Map<String, Object?> extra = const {},
+  ]) async {
     try {
-      await cloud!.pay(action, b);
+      await cloud!.pay(action, b, extra);
       return null;
     } on PayError catch (e) {
       return e.message;
     }
   }
 
-  /// El artista acepta: se cobra lo retenido. Devuelve un error o null.
-  Future<String?> acceptBooking(Booking b) async {
-    if (online && b.payment != PaymentStatus.simulado) {
-      final error = await _decide('accept', b);
+  /// Los cambios van por el servidor salvo en modo demo o en solicitudes
+  /// simuladas.
+  bool _viaServer(Booking b) => online && b.payment != PaymentStatus.simulado;
+
+  static String _price(double v) =>
+      '\$${v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(2)}';
+
+  /// El artista responde la solicitud con su precio. El cliente lo acepta
+  /// para reservar la fecha. Devuelve un error o null.
+  Future<String?> sendQuote(Booking b, double price, String note) async {
+    if (!b.open) return 'Esta solicitud ya no está abierta.';
+    if (_viaServer(b)) {
+      final error = await _decide('quote', b, {'price': price, 'note': note});
       if (error != null) return error;
     } else {
-      b.status = BookingStatus.confirmada;
-      if (!online) b.payment = PaymentStatus.cobrado;
+      b
+        ..status = BookingStatus.cotizada
+        ..quotePrice = price
+        ..quoteNote = note
+        ..total = price;
       cloud?.saveBooking(b);
     }
+    final when = DateFormat.yMMMEd('es').format(b.date);
     _notifyClient(
       b,
-      '${b.artist.name} aceptó tu reserva',
-      b.noDeposit
-          ? 'Tu reserva quedó confirmada. El pago se arregla directo con el '
-                'artista.'
-          : 'Tu reserva quedó confirmada. Se cobró el pago retenido.',
+      '${b.artist.name} te envió su precio',
+      '${_price(price)} para el $when. '
+          '${note.isEmpty ? '' : '$note '}'
+          'Acéptalo en la app para reservar la fecha.',
+    );
+    notifyListeners();
+    return null;
+  }
+
+  /// Otra reserva confirmada de la misma persona (cualquiera de sus
+  /// perfiles) ya ocupa esa hora.
+  bool hasConflict(Booking b) {
+    final owner = b.artist.ownerUid;
+    final buffer = Duration(minutes: b.artist.bufferMinutes);
+    bool overlaps(DateTime s, DateTime e) =>
+        b.start.isBefore(e.add(buffer)) && b.end.isAfter(s.subtract(buffer));
+    return bookings.any(
+          (x) =>
+              x != b &&
+              x.artist.ownerUid == owner &&
+              x.blocksSchedule &&
+              overlaps(x.start, x.end),
+        ) ||
+        artists
+            .where((a) => a.ownerUid == owner)
+            .expand((a) => a.busy)
+            .any((r) => overlaps(r.$1, r.$2));
+  }
+
+  /// El cliente acepta el precio: la fecha queda reservada. Devuelve un
+  /// error o null.
+  Future<String?> acceptQuote(Booking b) async {
+    if (b.status != BookingStatus.cotizada) {
+      return 'Esta cotización ya no está abierta.';
+    }
+    if (!_viaServer(b)) {
+      if (hasConflict(b)) {
+        return '${b.artist.name} ya tiene otra reserva a esa hora. '
+            'Escríbele para buscar otra fecha.';
+      }
+      b
+        ..status = BookingStatus.confirmada
+        ..total = b.quotePrice ?? b.total;
+      cloud?.saveBooking(b);
+    } else {
+      final error = await _decide('acceptQuote', b);
+      if (error != null) return error;
+    }
+    final when = DateFormat.yMMMEd('es').format(b.date);
+    notify(
+      AppNotification(
+        recipientEmail: b.artist.email,
+        title: '${b.clientName} aceptó tu precio',
+        body:
+            'Quedó reservado el $when en ${b.venue} (${b.artist.name}). '
+            'El pago se arregla directo con el cliente.',
+        byEmail: true,
+      ),
     );
     return null;
   }
 
-  /// El artista rechaza: se libera la retención (tarjeta) o se reembolsa
-  /// (ATH Móvil). Devuelve un error o null.
+  /// El artista confirma la fecha directamente (p. ej. ya acordaron el
+  /// precio por WhatsApp). [price] es el precio acordado, si lo pone.
+  Future<String?> acceptBooking(Booking b, {double? price}) async {
+    if (_viaServer(b)) {
+      final error = await _decide('accept', b, {'price': ?price});
+      if (error != null) return error;
+    } else {
+      b.status = BookingStatus.confirmada;
+      if (price != null) {
+        b
+          ..quotePrice = price
+          ..total = price;
+      }
+      if (!online && !b.noDeposit) b.payment = PaymentStatus.cobrado;
+      cloud?.saveBooking(b);
+    }
+    _notifyClient(
+      b,
+      '${b.artist.name} confirmó tu reserva',
+      b.noDeposit
+          ? 'Tu fecha quedó reservada. El pago se arregla directo con el '
+                'artista.'
+          : 'Tu reserva quedó confirmada. Se cobró el pago retenido.',
+    );
+    notifyListeners();
+    return null;
+  }
+
+  /// El artista no puede: se libera lo retenido si lo hubiera. Devuelve un
+  /// error o null.
   Future<String?> rejectBooking(Booking b) async {
-    if (online && b.payment != PaymentStatus.simulado) {
+    if (_viaServer(b)) {
       final error = await _decide('reject', b);
       if (error != null) return error;
     } else {
       b.status = BookingStatus.rechazada;
-      if (!online) b.payment = PaymentStatus.liberado;
+      if (!online && !b.noDeposit) b.payment = PaymentStatus.liberado;
       cloud?.saveBooking(b);
     }
     _notifyClient(
       b,
-      '${b.artist.name} no puede tomar tu reserva',
+      '${b.artist.name} no está disponible',
       b.payment == PaymentStatus.reembolsado
           ? 'Te devolvimos el pago por ATH Móvil. Puedes buscar otro artista '
                 'para esa fecha.'
-          : b.noDeposit
-          ? 'Puedes buscar otro artista para esa fecha.'
-          : 'No se cobró nada. Puedes buscar otro artista para esa fecha.',
+          : 'Puedes buscar otro artista para esa fecha.',
     );
+    notifyListeners();
     return null;
   }
 
-  /// El cliente cancela antes de que el artista responda.
+  /// El cliente cancela su solicitud o dice que no al precio.
   Future<String?> cancelBooking(Booking b) async {
-    if (online && b.payment != PaymentStatus.simulado) {
+    final quoted = b.status == BookingStatus.cotizada;
+    if (_viaServer(b)) {
       final error = await _decide('cancel', b);
       if (error != null) return error;
     } else {
       b.status = BookingStatus.cancelada;
-      if (!online) b.payment = PaymentStatus.liberado;
+      if (!online && !b.noDeposit) b.payment = PaymentStatus.liberado;
       cloud?.saveBooking(b);
+    }
+    if (quoted) {
+      notify(
+        AppNotification(
+          recipientEmail: b.artist.email,
+          title: '${b.clientName} no aceptó tu precio',
+          body:
+              'La solicitud para el '
+              '${DateFormat.yMMMEd('es').format(b.date)} se cerró.',
+        ),
+      );
     }
     notifyListeners();
     return null;
@@ -591,7 +837,7 @@ class AppState extends ChangeNotifier {
     if (cloud == null) {
       // Modo demo: se activa sin cobrar.
       final s = me.effectiveSubscription;
-      me.subscription = Subscription(
+      final sub = Subscription(
         status: s.inTrial ? 'trialing' : 'active',
         trialEnd: s.trialEnd,
         paidUntil: (s.inTrial ? s.trialEnd : DateTime.now()).add(
@@ -599,6 +845,10 @@ class AppState extends ChangeNotifier {
         ),
         simulated: true,
       );
+      // Una membresía cubre todos los perfiles de la cuenta.
+      for (final p in myProfiles.isEmpty ? [me] : myProfiles) {
+        p.subscription = sub;
+      }
       notifyListeners();
       return null;
     }
@@ -621,22 +871,6 @@ class AppState extends ChangeNotifier {
     } on PayError catch (e) {
       return e.message;
     }
-  }
-
-  void savePackage(Artist a, PricePackage p, {PricePackage? replacing}) {
-    if (replacing != null) {
-      a.packages[a.packages.indexOf(replacing)] = p;
-    } else {
-      a.packages.add(p);
-    }
-    cloud?.saveArtist(a);
-    notifyListeners();
-  }
-
-  void removePackage(Artist a, PricePackage p) {
-    a.packages.remove(p);
-    cloud?.saveArtist(a);
-    notifyListeners();
   }
 
   void addLink(Artist a, MediaLink link) {

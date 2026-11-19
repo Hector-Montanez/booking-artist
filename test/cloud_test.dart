@@ -15,7 +15,9 @@ void main() {
     final b = artistFromMap(a.id, artistToMap(a));
     expect(b.name, a.name);
     expect(b.category, ArtistCategory.payaso);
-    expect(b.packages.map((p) => p.price), a.packages.map((p) => p.price));
+    expect(b.priceFrom, a.priceFrom);
+    expect(b.whatsapp, a.whatsapp);
+    expect(b.ownerUid, 'p1');
     expect(b.links.length, a.links.length);
     expect(b.weeklyHours.keys, a.weeklyHours.keys);
     expect(b.weeklyHours[6]!.end, a.weeklyHours[6]!.end);
@@ -24,6 +26,18 @@ void main() {
     expect(b.gallery.single, [4, 5]);
     expect(b.color.toARGB32(), a.color.toARGB32());
     expect(b.eventTypes, a.eventTypes);
+  });
+
+  test('un perfil extra guarda de qué cuenta es', () {
+    final trio = buildMockArtists().firstWhere((a) => a.id == 'a1__2');
+    expect(trio.ownerUid, 'a1');
+    final map = artistToMap(trio);
+    expect(map['ownerUid'], 'a1');
+    expect(map.containsKey('packages'), isFalse);
+    final back = artistFromMap(trio.id, map);
+    expect(back.ownerUid, 'a1');
+    expect(back.priceFrom, isNull);
+    expect(back.whatsapp, '787 555 0202');
   });
 
   test('fotos que no caben no rompen el documento', () {
