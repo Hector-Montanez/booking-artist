@@ -44,13 +44,20 @@ void main() {
 
     await tester.enterText(find.byType(TextField).first, me.name);
     await tester.pumpAndSettle();
+    expect(find.text('Este eres tú'), findsWidgets);
+    // Su otro perfil (el trío) sale aparte y también es suyo.
+    await tester.enterText(find.byType(TextField).first, 'Trío');
+    await tester.pumpAndSettle();
     expect(find.text('Este eres tú'), findsOneWidget);
 
-    // Sin membresía activa no aparece en la lista.
-    me.subscription = Subscription(
+    // Sin membresía activa no aparece ninguno: es una sola para la cuenta.
+    final canceled = Subscription(
       status: 'canceled',
       trialEnd: DateTime.now().subtract(const Duration(days: 1)),
     );
+    for (final p in state.myProfiles) {
+      p.subscription = canceled;
+    }
     state.artistUpdated();
     await tester.pumpAndSettle();
     expect(find.text('Este eres tú'), findsNothing);
@@ -67,7 +74,6 @@ void main() {
       Booking(
         id: 'cal-1',
         artist: me,
-        package: me.packages.first.name,
         eventType: EventType.boda,
         date: DateTime(day.year, day.month, day.day),
         time: const TimeOfDay(hour: 20, minute: 0),
@@ -80,11 +86,13 @@ void main() {
         cardLast4: '4242',
       ),
     );
+    // Solo las fechas confirmadas van al calendario.
+    await state.acceptBooking(state.bookings.first, price: 300);
     await show(tester, state, const ArtistCalendarScreen());
     expect(find.text('Mi calendario'), findsOneWidget);
     expect(find.textContaining('Boda Rivera-Cruz'), findsOneWidget);
     expect(find.text('Hacienda Siesta Alegre'), findsOneWidget);
-    expect(find.text('Esperando respuesta'), findsWidgets);
+    expect(find.text('Confirmada'), findsWidgets);
 
     // Otro mes: la actividad ya no sale en la lista del día escogido.
     await tester.tap(find.byTooltip('Mes siguiente'));

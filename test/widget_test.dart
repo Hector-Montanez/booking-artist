@@ -78,7 +78,8 @@ void main() {
     expect(tester.getTopLeft(find.text('DJ Nova')).dy, greaterThan(otherY));
     await tester.tap(find.text('Sofía Rivera'));
     await tester.pumpAndSettle();
-    expect(find.text('Precios del artista'), findsOneWidget);
+    expect(find.text('Pedir cotización'), findsOneWidget);
+    expect(find.textContaining('Precios del artista'), findsNothing);
   });
 
   testWidgets('Un artista crea su cuenta y edita su página', (tester) async {
@@ -174,7 +175,6 @@ void main() {
       Booking(
         id: 'hoy',
         artist: sofia,
-        package: sofia.packages.first.name,
         eventType: EventType.restaurante,
         date: DateTime(today.year, today.month, today.day),
         time: const TimeOfDay(hour: 23, minute: 0),
@@ -183,7 +183,7 @@ void main() {
         clientType: ClientType.restaurante,
         clientEmail: AppState.demoClientEmail,
         notes: '',
-        total: sofia.packages.first.price,
+        total: 180,
         amountCharged: 0,
         payDeposit: false,
         noDeposit: true,

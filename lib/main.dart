@@ -94,16 +94,20 @@ class _ShellState extends State<_Shell> {
   @override
   Widget build(BuildContext context) {
     final state = AppScope.of(context);
+    // Lo que espera respuesta de esta persona: el artista, solicitudes sin
+    // precio (de cualquiera de sus perfiles); el cliente, precios por
+    // aceptar.
     final pending = widget.artist
         ? state.bookings
               .where(
                 (b) =>
-                    b.artist == state.myArtistProfile &&
-                    b.status == BookingStatus.pendiente,
+                    state.isMine(b.artist) &&
+                    b.status == BookingStatus.pendiente &&
+                    b.payment != PaymentStatus.porPagar,
               )
               .length
         : state.myClientBookings
-              .where((b) => b.status == BookingStatus.pendiente)
+              .where((b) => b.status == BookingStatus.cotizada)
               .length;
     final inboxCount = state.unreadMessages + state.unreadNotifications;
     final inbox = NavigationDestination(
@@ -121,12 +125,13 @@ class _ShellState extends State<_Shell> {
     );
 
     final pages = widget.artist
-        ? const [
-            ArtistPanelScreen(),
-            ArtistCalendarScreen(),
-            ExploreScreen(forArtist: true),
-            InboxScreen(),
-            EditPageScreen(),
+        ? [
+            const ArtistPanelScreen(),
+            const ArtistCalendarScreen(),
+            const ExploreScreen(forArtist: true),
+            const InboxScreen(),
+            // Al cambiar de perfil, el editor empieza de nuevo con sus datos.
+            EditPageScreen(key: ValueKey(state.myArtistProfile.id)),
           ]
         : const [
             ExploreScreen(),
@@ -149,9 +154,9 @@ class _ShellState extends State<_Shell> {
               label: 'Explorar',
             ),
             inbox,
-            const NavigationDestination(
-              icon: Icon(Icons.brush),
-              label: 'Mi página',
+            NavigationDestination(
+              icon: const Icon(Icons.brush),
+              label: state.myProfiles.length > 1 ? 'Mis perfiles' : 'Mi página',
             ),
           ]
         : [

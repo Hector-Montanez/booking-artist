@@ -11,7 +11,8 @@ String formatMinutes(BuildContext context, int minutes) {
 
 /// Horas en que el cliente puede empezar un evento de [durationMinutes] con
 /// [artist] el día [day]. Respeta el horario semanal, los días libres y las
-/// reservas pendientes o confirmadas (más el tiempo de traslado).
+/// reservas confirmadas (más el tiempo de traslado) de todos los perfiles de
+/// la misma persona: si su agrupación toca a esa hora, el solista no puede.
 List<TimeOfDay> availableStarts({
   required Artist artist,
   required List<Booking> bookings,
@@ -28,7 +29,7 @@ List<TimeOfDay> availableStarts({
   final current = now ?? DateTime.now();
   final buffer = Duration(minutes: artist.bufferMinutes);
   final busy = bookings
-      .where((b) => b.artist == artist && b.blocksSchedule)
+      .where((b) => b.artist.ownerUid == artist.ownerUid && b.blocksSchedule)
       .map((b) => (b.start, b.end))
       .followedBy(artist.busy)
       .map((r) => (r.$1.subtract(buffer), r.$2.add(buffer)))

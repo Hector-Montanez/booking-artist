@@ -9,7 +9,8 @@ import 'account_screen.dart';
 import 'availability_screen.dart';
 import 'inbox_screen.dart';
 
-/// Vista del artista: fija sus precios, pega sus enlaces y acepta solicitudes.
+/// Vista del artista: responde las solicitudes de cotización de todos sus
+/// perfiles y pega sus enlaces.
 class ArtistPanelScreen extends StatelessWidget {
   const ArtistPanelScreen({super.key});
 
@@ -17,10 +18,20 @@ class ArtistPanelScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final state = AppScope.of(context);
     final me = state.myArtistProfile;
-    // Las reservas sin pagar no le llegan al artista.
-    final requests = state.bookings
-        .where((b) => b.artist == me && b.payment != PaymentStatus.porPagar)
-        .toList();
+    final several = state.myProfiles.length > 1;
+    // Solicitudes a cualquiera de sus perfiles; las abiertas primero. Las
+    // reservas sin pagar (de cuando había pagos) no le llegan al artista.
+    final requests =
+        state.bookings
+            .where(
+              (b) =>
+                  state.isMine(b.artist) && b.payment != PaymentStatus.porPagar,
+            )
+            .toList()
+          ..sort((a, b) {
+            if (a.open != b.open) return a.open ? -1 : 1;
+            return a.start.compareTo(b.start);
+          });
 
     return Scaffold(
       appBar: AppBar(
@@ -35,11 +46,12 @@ class ArtistPanelScreen extends StatelessWidget {
             leading: ArtistAvatar(artist: me),
             title: Text(me.name, style: Theme.of(context).textTheme.titleLarge),
             subtitle: Text(
-              me.packages.isEmpty
-                  ? 'Añade al menos un precio para aparecer en Explorar.'
-                  : me.listed
-                  ? 'Tu página está publicada.'
-                  : 'Tu página no aparece: activa tu suscripción.',
+              me.listed
+                  ? several
+                        ? 'Tus ${state.myProfiles.length} perfiles están '
+                              'publicados.'
+                        : 'Tu página está publicada.'
+                  : 'Tu página no aparece: activa tu membresía.',
             ),
           ),
           const SubscriptionCard(),
@@ -59,34 +71,18 @@ class ArtistPanelScreen extends StatelessWidget {
               ),
             ),
           ),
-          _header(context, 'Solicitudes recibidas'),
+          _header(context, 'Solicitudes de cotización'),
           if (requests.isEmpty)
             const Text(
-              'Sin solicitudes todavía. Aquí verás las reservas que te envíen los clientes.',
+              'Sin solicitudes todavía. Cuando un cliente te pida precio, '
+              'aquí le respondes con tu cotización.',
             ),
-          for (final b in requests) _RequestCard(booking: b, state: state),
+          for (final b in requests)
+            _RequestCard(booking: b, state: state, showProfile: several),
           _header(
             context,
-            'Mis precios',
-            onAdd: () => _editPackage(context, state, me),
+            several ? 'Reseñas de ${me.name}' : 'Reseñas de mis clientes',
           ),
-          for (final p in me.packages)
-            Card(
-              child: ListTile(
-                leading: Icon(p.kind.icon),
-                title: Text(p.name),
-                subtitle: Text(
-                  '${p.kind.label} · '
-                  '${p.hours} h${p.description.isEmpty ? '' : ' · ${p.description}'}',
-                ),
-                trailing: Text(
-                  money(p.price),
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                onTap: () => _editPackage(context, state, me, existing: p),
-              ),
-            ),
-          _header(context, 'Reseñas de mis clientes'),
           if (me.reviews == 0)
             const Text(
               'Aún no tienes reseñas. Tus clientes pueden dejarte estrellas '
@@ -109,7 +105,7 @@ class ArtistPanelScreen extends StatelessWidget {
           ],
           _header(
             context,
-            'Mis videos y redes',
+            several ? 'Videos y redes de ${me.name}' : 'Mis videos y redes',
             onAdd: () => _addLink(context, state, me),
           ),
           for (final l in me.links)
@@ -150,158 +146,6 @@ class ArtistPanelScreen extends StatelessWidget {
           ],
         ),
       );
-
-  Future<void> _editPackage(
-    BuildContext context,
-    AppState state,
-    Artist me, {
-    PricePackage? existing,
-  }) async {
-    final name = TextEditingController(text: existing?.name);
-    final price = TextEditingController(
-      text: existing?.price.toStringAsFixed(0),
-    );
-    final hours = TextEditingController(
-      text: existing?.hours.toString() ?? '2',
-    );
-    final desc = TextEditingController(text: existing?.description);
-    var kind = existing?.kind ?? PackageKind.actividad;
-    final formKey = GlobalKey<FormState>();
-
-    final saved = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheet) => Padding(
-          padding: EdgeInsets.fromLTRB(
-            16,
-            16,
-            16,
-            MediaQuery.of(ctx).viewInsets.bottom + 16,
-          ),
-          child: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  existing == null ? 'Nuevo paquete' : 'Editar paquete',
-                  style: Theme.of(ctx).textTheme.titleLarge,
-                ),
-                const SizedBox(height: 12),
-                SegmentedButton<PackageKind>(
-                  segments: [
-                    for (final k in PackageKind.values)
-                      ButtonSegment(
-                        value: k,
-                        icon: Icon(k.icon),
-                        label: Text(
-                          k == PackageKind.actividad ? 'Actividad' : k.label,
-                        ),
-                      ),
-                  ],
-                  selected: {kind},
-                  onSelectionChanged: (v) => setSheet(() => kind = v.first),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  kind.description,
-                  style: Theme.of(ctx).textTheme.bodySmall,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: name,
-                  decoration: const InputDecoration(
-                    labelText: 'Nombre',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: (v) =>
-                      (v ?? '').trim().isEmpty ? 'Requerido' : null,
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: price,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: 'Precio',
-                          prefixText: r'$ ',
-                          border: OutlineInputBorder(),
-                        ),
-                        validator: (v) =>
-                            double.tryParse(v ?? '') == null ? 'Número' : null,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TextFormField(
-                        controller: hours,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        decoration: const InputDecoration(
-                          labelText: 'Horas',
-                          border: OutlineInputBorder(),
-                        ),
-                        validator: (v) =>
-                            double.tryParse(v ?? '') == null ? 'Número' : null,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                TextFormField(
-                  controller: desc,
-                  decoration: const InputDecoration(
-                    labelText: 'Qué incluye (opcional)',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    if (existing != null)
-                      TextButton(
-                        onPressed: () {
-                          state.removePackage(me, existing);
-                          Navigator.pop(ctx, false);
-                        },
-                        child: const Text('Eliminar'),
-                      ),
-                    const Spacer(),
-                    FilledButton(
-                      onPressed: () {
-                        if (formKey.currentState!.validate()) {
-                          Navigator.pop(ctx, true);
-                        }
-                      },
-                      child: const Text('Guardar'),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-    if (saved == true) {
-      state.savePackage(
-        me,
-        PricePackage(
-          name: name.text.trim(),
-          price: double.parse(price.text),
-          hours: double.parse(hours.text),
-          description: desc.text.trim(),
-          kind: kind,
-        ),
-        replacing: existing,
-      );
-    }
-  }
 
   Future<void> _addLink(BuildContext context, AppState state, Artist me) async {
     final url = TextEditingController();
@@ -355,15 +199,24 @@ LinkKind detectLinkKind(String url) {
 }
 
 class _RequestCard extends StatelessWidget {
-  const _RequestCard({required this.booking, required this.state});
+  const _RequestCard({
+    required this.booking,
+    required this.state,
+    this.showProfile = false,
+  });
 
   final Booking booking;
   final AppState state;
+
+  /// La cuenta tiene varios perfiles: se dice a cuál le pidieron.
+  final bool showProfile;
 
   @override
   Widget build(BuildContext context) {
     final b = booking;
     final fmt = DateFormat.yMMMEd('es');
+    final theme = Theme.of(context);
+    final price = b.quotePrice ?? (b.isQuote ? null : b.total);
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -375,10 +228,7 @@ class _RequestCard extends StatelessWidget {
                 Icon(b.clientType.icon),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text(
-                    b.clientName,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
+                  child: Text(b.clientName, style: theme.textTheme.titleMedium),
                 ),
                 Text(b.status.label, style: TextStyle(color: b.status.color)),
                 if (b.clientEmail.isNotEmpty)
@@ -389,23 +239,40 @@ class _RequestCard extends StatelessWidget {
                   ),
               ],
             ),
+            if (showProfile)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text(
+                  'Para: ${b.artist.name}',
+                  style: TextStyle(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
             Text('${b.clientType.label} · ${b.eventType.label}'),
             const SizedBox(height: 4),
-            Text('${fmt.format(b.date)} · ${b.time.format(context)}'),
-            Text(b.venue),
-            Text(b.package),
-            if (b.notes.isNotEmpty) Text('Notas: ${b.notes}'),
-            const SizedBox(height: 4),
             Text(
-              b.noDeposit
-                  ? '${money(b.total)} a pagar directo al artista'
-                  : '${b.payDeposit ? 'Depósito' : 'Pago completo'} '
-                        '(${b.paidWith}): '
-                        '${money(b.amountCharged)} de ${money(b.total)} · '
-                        '${b.payment.label}',
-              style: const TextStyle(fontWeight: FontWeight.w600),
+              '${fmt.format(b.date)} · ${b.time.format(context)} · '
+              '${_hours(b.hours)}',
             ),
-            if (b.status == BookingStatus.pendiente) ...[
+            Text(b.venue),
+            if (!b.isQuote) Text(b.package),
+            if (b.notes.isNotEmpty) Text('Detalles: ${b.notes}'),
+            const SizedBox(height: 4),
+            Text(switch (b.status) {
+              BookingStatus.pendiente when b.isQuote =>
+                'Te pide cotización. Envíale tu precio.',
+              BookingStatus.cotizada =>
+                'Le enviaste ${money(price ?? 0)}. Falta que el cliente '
+                    'lo acepte.',
+              _ when price != null && price > 0 =>
+                '${money(price)} · el pago se arregla directo contigo',
+              _ => 'El pago se arregla directo contigo',
+            }, style: const TextStyle(fontWeight: FontWeight.w600)),
+            if (b.quoteNote.isNotEmpty)
+              Text('Tu nota: ${b.quoteNote}', style: theme.textTheme.bodySmall),
+            if (b.open) ...[
               const SizedBox(height: 8),
               Row(
                 children: [
@@ -413,18 +280,28 @@ class _RequestCard extends StatelessWidget {
                     child: OutlinedButton(
                       onPressed: () =>
                           _respond(context, () => state.rejectBooking(b)),
-                      child: const Text('Rechazar'),
+                      child: const Text('No puedo'),
                     ),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: FilledButton(
-                      onPressed: () =>
-                          _respond(context, () => state.acceptBooking(b)),
-                      child: const Text('Aceptar'),
+                      onPressed: () => _quote(context, b),
+                      child: Text(
+                        b.status == BookingStatus.cotizada
+                            ? 'Cambiar precio'
+                            : 'Enviar precio',
+                      ),
                     ),
                   ),
                 ],
+              ),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () => _confirm(context, b),
+                  child: const Text('Ya acordamos: confirmar fecha'),
+                ),
               ),
             ],
           ],
@@ -432,16 +309,142 @@ class _RequestCard extends StatelessWidget {
       ),
     );
   }
+
+  /// El artista escribe su precio (y qué incluye) para esta solicitud.
+  Future<void> _quote(BuildContext context, Booking b) async {
+    final result = await _askPrice(
+      context,
+      title: 'Tu precio para ${b.clientName}',
+      button: 'Enviar precio',
+      initial: b.quotePrice,
+      withNote: true,
+      note: b.quoteNote,
+      required: true,
+    );
+    if (result == null || !context.mounted) return;
+    await _respond(
+      context,
+      () => state.sendQuote(b, result.$1!, result.$2),
+      done: 'Le enviamos tu precio a ${b.clientName}.',
+    );
+  }
+
+  /// Confirma la fecha sin esperar al cliente (ya acordaron, p. ej. por
+  /// WhatsApp). El precio acordado es opcional.
+  Future<void> _confirm(BuildContext context, Booking b) async {
+    final result = await _askPrice(
+      context,
+      title: 'Confirmar la fecha',
+      button: 'Confirmar',
+      initial: b.quotePrice,
+      intro:
+          'Usa esto si ya acordaste el precio con ${b.clientName} (por '
+          'ejemplo, por WhatsApp). La fecha queda reservada.',
+    );
+    if (result == null || !context.mounted) return;
+    await _respond(
+      context,
+      () => state.acceptBooking(b, price: result.$1),
+      done: 'Fecha confirmada. Le avisamos a ${b.clientName}.',
+    );
+  }
 }
 
-/// Acepta o rechaza y muestra el error del servidor de pagos, si hay.
+String _hours(double h) => h == h.roundToDouble() ? '${h.toInt()} h' : '$h h';
+
+/// Pide un precio (y una nota). Devuelve null si se canceló.
+Future<(double?, String)?> _askPrice(
+  BuildContext context, {
+  required String title,
+  required String button,
+  double? initial,
+  String intro = '',
+  bool withNote = false,
+  String note = '',
+  bool required = false,
+}) {
+  final price = TextEditingController(
+    text: initial == null ? '' : initial.toStringAsFixed(0),
+  );
+  final noteCtrl = TextEditingController(text: note);
+  final formKey = GlobalKey<FormState>();
+  return showDialog<(double?, String)>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: Text(title),
+      content: Form(
+        key: formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (intro.isNotEmpty) ...[Text(intro), const SizedBox(height: 12)],
+            TextFormField(
+              controller: price,
+              autofocus: true,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              decoration: InputDecoration(
+                labelText: required ? 'Precio' : 'Precio acordado (opcional)',
+                prefixText: r'$ ',
+                border: const OutlineInputBorder(),
+              ),
+              validator: (v) {
+                final t = (v ?? '').trim();
+                if (t.isEmpty) return required ? 'Escribe tu precio' : null;
+                final n = double.tryParse(t);
+                if (n == null || n <= 0 || n > 100000) {
+                  return 'Escribe un número';
+                }
+                return null;
+              },
+            ),
+            if (withNote) ...[
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: noteCtrl,
+                maxLines: 3,
+                maxLength: 300,
+                decoration: const InputDecoration(
+                  labelText: 'Qué incluye (opcional)',
+                  hintText: 'Ej. 3 sets de 45 minutos con sonido incluido',
+                  alignLabelWithHint: true,
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: () {
+            if (!formKey.currentState!.validate()) return;
+            final t = price.text.trim();
+            Navigator.pop(ctx, (
+              t.isEmpty ? null : double.parse(t),
+              noteCtrl.text.trim(),
+            ));
+          },
+          child: Text(button),
+        ),
+      ],
+    ),
+  );
+}
+
+/// Hace el cambio y muestra el error del servidor, o [done] si salió bien.
 Future<void> _respond(
   BuildContext context,
-  Future<String?> Function() action,
-) async {
+  Future<String?> Function() action, {
+  String? done,
+}) async {
   final messenger = ScaffoldMessenger.of(context);
   final error = await action();
-  if (error != null) {
-    messenger.showSnackBar(SnackBar(content: Text(error)));
-  }
+  final text = error ?? done;
+  if (text != null) messenger.showSnackBar(SnackBar(content: Text(text)));
 }

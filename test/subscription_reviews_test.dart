@@ -2,7 +2,6 @@ import 'package:booking_artist/app_state.dart';
 import 'package:booking_artist/models.dart';
 import 'package:booking_artist/screens/artist_detail_screen.dart';
 import 'package:booking_artist/screens/artist_panel_screen.dart';
-import 'package:booking_artist/screens/booking_screen.dart';
 import 'package:booking_artist/screens/my_bookings_screen.dart';
 import 'package:booking_artist/theme.dart';
 import 'package:flutter/material.dart';
@@ -73,7 +72,6 @@ void main() {
       final future = Booking(
         id: 'x',
         artist: sofia,
-        package: sofia.packages.first.name,
         eventType: EventType.boda,
         date: DateTime.now().add(const Duration(days: 3)),
         time: const TimeOfDay(hour: 20, minute: 0),
@@ -95,42 +93,72 @@ void main() {
     },
   );
 
-  testWidgets(
-    'un paquete de restaurante se reserva sin pagar y no hay depósito',
-    (tester) async {
-      tester.view.physicalSize = const Size(800, 2400);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.reset);
-      final state = AppState();
-      await state.login(AppState.demoClientEmail, AppState.demoPassword);
-      final sofia = state.artists.firstWhere((a) => a.id == 'a1');
-      final cena = sofia.packages.firstWhere(
-        (p) => p.kind == PackageKind.restaurante,
-      );
-      final boda = sofia.packages.firstWhere(
-        (p) => p.kind == PackageKind.actividad,
-      );
+  testWidgets('el cliente pide cotización: no hay precios fijos ni pagos', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final state = AppState();
+    await state.login(AppState.demoClientEmail, AppState.demoPassword);
+    final sofia = state.artists.firstWhere((a) => a.id == 'a1');
 
-      await tester.pumpWidget(
-        AppScope(
-          state: state,
-          child: MaterialApp(
-            home: BookingScreen(artist: sofia, initialPackage: cena),
-          ),
+    await tester.pumpWidget(
+      AppScope(
+        state: state,
+        child: MaterialApp(home: ArtistDetailScreen(artist: sofia)),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Pedir cotización'), findsOneWidget);
+    expect(find.byTooltip('Escribir por WhatsApp'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('Precio a cotizar'), 300);
+    expect(find.text('Precio a cotizar'), findsOneWidget);
+
+    await tester.tap(find.text('Pedir cotización'));
+    await tester.pumpAndSettle();
+    expect(find.text('Cotizar con Sofía Rivera'), findsOneWidget);
+    expect(find.textContaining('No pagas nada por la app'), findsOneWidget);
+    expect(find.textContaining('Continuar al pago'), findsNothing);
+    expect(find.textContaining('Depósito'), findsNothing);
+  });
+
+  testWidgets('el cliente acepta el precio y queda reservado', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await initializeDateFormatting('es');
+    final state = AppState();
+    await state.login(AppState.demoClientEmail, AppState.demoPassword);
+    final quoted = state.bookings.firstWhere((b) => b.id == 'seed-cotizada');
+
+    await tester.pumpWidget(
+      AppScope(
+        state: state,
+        child: MaterialApp(
+          theme: futuristTheme(),
+          home: const MyBookingsScreen(),
         ),
-      );
-      expect(find.text('Enviar solicitud'), findsOneWidget);
-      expect(find.text('Sin pago por la app'), findsOneWidget);
-      expect(find.textContaining('Depósito'), findsNothing);
-
-      await tester.tap(find.text(boda.name));
-      await tester.pumpAndSettle();
-      // MVP: las actividades tampoco se pagan por la app.
-      expect(find.text('Enviar solicitud'), findsOneWidget);
-      expect(find.textContaining('Continuar al pago'), findsNothing);
-      expect(find.textContaining('Depósito'), findsNothing);
-    },
-  );
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.textContaining('te propone \$350'), findsOneWidget);
+    final accept = find.widgetWithText(FilledButton, 'Aceptar y reservar');
+    await tester.ensureVisible(accept);
+    await tester.pumpAndSettle();
+    await tester.tap(accept);
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.text('Aceptar y reservar'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(quoted.status, BookingStatus.confirmada);
+    expect(quoted.total, 350);
+    expect(find.textContaining('quedó reservada'), findsOneWidget);
+  });
 
   testWidgets('las pantallas nuevas caben en un teléfono', (tester) async {
     tester.view.physicalSize = const Size(390, 844);
@@ -153,8 +181,10 @@ void main() {
     await tester.tap(find.text('Activar suscripción'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Suscrito'), findsOneWidget);
-    await tester.scrollUntilVisible(find.text('Reseñas de mis clientes'), 300);
-    expect(find.text('Reseñas de mis clientes'), findsOneWidget);
+    expect(find.text('Solicitudes de cotización'), findsOneWidget);
+    // Sofía tiene dos perfiles: las reseñas son del que está editando.
+    await tester.scrollUntilVisible(find.text('Reseñas de Sofía Rivera'), 300);
+    expect(find.text('Reseñas de Sofía Rivera'), findsOneWidget);
 
     state.signOut();
     await state.login(AppState.demoClientEmail, AppState.demoPassword);

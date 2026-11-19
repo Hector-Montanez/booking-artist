@@ -7,17 +7,18 @@ Para todo Puerto Rico (la primera prueba fue en Caguas). Usa datos de ejemplo: s
 - **Crear cuenta**: al abrir la app se escoge "Quiero contratar" o "Soy artista".
   - Cliente: nombre, teléfono, correo, contraseña y si es **cliente privado**, **restaurante/negocio** o **agrupación/banda** (con nombre y dirección del local, que se llenan solos al reservar).
   - Artista: tipo (**Solista**, **Músico independiente**, **Agrupación**, **DJ** o **Payaso**), instrumentos que toca, nombre artístico, géneros y datos de contacto. Las agrupaciones pueden buscar músicos independientes por instrumento (bongosero, bajista, cuatrista…).
-- **Mi página (artista)**: subir foto de perfil, portada y galería de fotos; frase corta, biografía, géneros, eventos que acepta y color de la página. El botón "Ver" muestra la página como la ven los clientes. Un artista aparece en Explorar cuando publica al menos un precio.
+- **Mi página (artista)**: subir foto de perfil, portada y galería de fotos; frase corta, biografía, géneros, eventos que acepta, color de la página, WhatsApp y un precio de referencia opcional ("Desde $X"). El botón "Ver" muestra la página como la ven los clientes. Un perfil aparece en Explorar mientras la membresía de la cuenta esté activa.
+- **Varios perfiles por cuenta**: un artista puede crear otros perfiles (solista, agrupación, músico independiente…) desde Mi página. Cada uno sale aparte en Explorar con su propia página. La primera página tiene el id de la cuenta y las demás `<cuenta>__<n>` (con `ownerUid`). Una sola membresía cubre todos los perfiles, y una fecha confirmada en un perfil también ocupa esa hora en los demás.
 - **Explorar**: artistas cerca de ti, búsqueda por nombre o género, filtros por tipo de artista y de evento, orden por distancia, precio o valoración.
-- **Perfil del artista**: biografía, géneros, precios fijados por el artista, videos y redes (enlaces públicos que el artista pega).
-- **Reservar**: paquete, tipo de evento, fecha, hora, lugar y notas; el cliente lee y acepta las condiciones del artista y envía la solicitud. **En el MVP no se paga nada por la app**: el pago del evento se arregla directo con el artista, y lo único que Tarima cobra es la membresía del artista. El cobro con tarjeta (Stripe) o ATH Móvil sigue en el código, apagado: para encenderlo, `inAppPayments = true` en `lib/models.dart` y `IN_APP_PAYMENTS=on` en Vercel (sin depósito: se cobraría el total).
+- **Perfil del artista**: biografía, géneros, precio de referencia opcional, videos y redes (enlaces públicos que el artista pega). Botones para pedir cotización, escribir en la app o por WhatsApp (abre `wa.me` con el mensaje ya escrito pidiendo el precio).
+- **Pedir cotización**: no hay precios fijos. El cliente escoge tipo de evento, horas, fecha, hora, lugar y detalles, acepta las condiciones y envía la solicitud. El artista responde con su precio (y qué incluye) o confirma directo lo que acordaron por WhatsApp; el cliente acepta el precio y la fecha queda reservada. Pedir cotización no aparta la hora: solo las fechas confirmadas ocupan el calendario. **En el MVP no se paga nada por la app**: el pago del evento se arregla directo con el artista, y lo único que Tarima cobra es la membresía del artista. El cobro con tarjeta (Stripe) o ATH Móvil sigue en el código, apagado.
 - **Mis reservas**: estado de cada solicitud (pendiente, confirmada, cancelada). Después de un evento confirmado, el cliente puede dejarle **estrellas (1 a 5) y una reseña** al artista; se ven en su página y en su panel.
-- **Paquetes de restaurante o de actividades**: el artista marca cada paquete; los de restaurante se ofrecen a restaurantes y los de actividades a bodas, cumpleaños y eventos.
+
 - **Suscripción del artista**: $10 al mes para aparecer en la app, con el **primer mes gratis** desde que crea su cuenta (sin pedir tarjeta). Si se suscribe durante el mes gratis, Stripe no cobra hasta que termine. Si se acaba el mes gratis sin suscribirse, o cancela, su página deja de salir en Explorar y no se le puede reservar.
 - **Explorar (artista)**: el artista ve la misma lista de artistas que los clientes y puede buscarse. Arriba le dice si está apareciendo (membresía activa o mes gratis) o qué le falta.
-- **Calendario (artista)**: un mes a la vista con sus actividades reservadas marcadas por día (verde confirmada, amarillo esperando respuesta) y los días libres tachados. Al tocar un día ve la hora, el cliente, el lugar y el paquete.
+- **Calendario (artista)**: un mes a la vista con sus actividades reservadas confirmadas (de todos sus perfiles) marcadas por día y los días libres tachados. Al tocar un día ve la hora, el cliente, el lugar y el perfil con que toca.
 - **Mi cuenta (artista)**: se abre con el botón de la persona arriba a la derecha en Solicitudes y Mi página.
-- **Solicitudes (artista)**: el artista edita sus precios, añade enlaces de YouTube/Instagram/TikTok y acepta o rechaza solicitudes, viendo si vienen de un cliente privado o de un restaurante.
+- **Solicitudes (artista)**: las solicitudes de cotización de todos sus perfiles; el artista envía o cambia su precio, confirma la fecha o dice que no. También añade enlaces de YouTube/Instagram/TikTok.
 
 - **Disponibilidad**: el artista define su horario semanal (qué días y de qué hora a qué hora), sus días libres y el tiempo que necesita entre eventos. Al reservar, el cliente solo puede escoger días y horas libres; las reservas pendientes o confirmadas bloquean ese horario.
 - **Avisos**: cuando llega una solicitud de reserva, el artista recibe una notificación en su teléfono y un email. Cuando el artista acepta o rechaza, el cliente también recibe aviso. En el prototipo se ven en la pestaña Mensajes > Avisos.
@@ -52,7 +53,7 @@ Las cuentas, fotos y reservas viven en memoria; al cerrar la app se reinician. P
 
 ## Estructura
 - `lib/main.dart`: arranque y barra de navegación
-- `lib/models.dart`: artista, paquete de precios, reserva
+- `lib/models.dart`: artista (perfiles), reserva / cotización
 - `lib/data/mock_artists.dart`: artistas de ejemplo (aquí se cambian)
 - `lib/app_state.dart`: estado de la app
 - `lib/screens/`: pantallas

@@ -46,7 +46,8 @@ class _ArtistCalendarScreenState extends State<ArtistCalendarScreen> {
     // ocupan el calendario.
     final byDay = <DateTime, List<Booking>>{};
     for (final b in client ? state.myClientBookings : state.bookings) {
-      if ((!client && b.artist != me) || !b.blocksSchedule) continue;
+      // El artista ve las fechas de todos sus perfiles.
+      if ((!client && !state.isMine(b.artist)) || !b.blocksSchedule) continue;
       if (b.payment == PaymentStatus.porPagar) continue;
       byDay.putIfAbsent(dayOnly(b.date), () => []).add(b);
     }
@@ -393,7 +394,8 @@ class _EventCard extends StatelessWidget {
               '${b.eventType.label}',
               style: const TextStyle(fontWeight: FontWeight.w600),
             ),
-            Text(b.package),
+            // Con varios perfiles, el artista ve con cuál toca.
+            Text(forClient || !b.isQuote ? b.package : b.artist.name),
             Row(
               children: [
                 const Icon(Icons.place, size: 16),

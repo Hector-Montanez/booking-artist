@@ -18,7 +18,7 @@ class ArtistDetailScreen extends StatelessWidget {
 
   final Artist artist;
 
-  /// El artista está viendo su propia página: se oculta el botón Reservar.
+  /// El artista está viendo su propia página: se oculta Pedir cotización.
   final bool preview;
 
   @override
@@ -206,30 +206,25 @@ class ArtistDetailScreen extends StatelessWidget {
                   'Disponible para: ${artist.eventTypes.map((e) => e.label).join(', ')}',
                   style: theme.textTheme.bodyMedium,
                 ),
-                const _SectionTitle('Precios del artista'),
-                for (final p in artist.packages)
-                  Card(
-                    child: ListTile(
-                      title: Text(p.name),
-                      subtitle: Text(
-                        [
-                          '${_hours(p.hours)} de presentación · '
-                              '${p.kind.label}',
-                          if (p.description.isNotEmpty) p.description,
-                        ].join('\n'),
+                const _SectionTitle('Precio'),
+                Card(
+                  child: ListTile(
+                    leading: const Icon(Icons.request_quote),
+                    title: Text(
+                      priceLabel(artist),
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: theme.colorScheme.primary,
+                        fontWeight: FontWeight.bold,
                       ),
-                      leading: Icon(p.kind.icon),
-                      isThreeLine: p.description.isNotEmpty,
-                      trailing: Text(
-                        money(p.price),
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          color: theme.colorScheme.primary,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      onTap: () => _book(context, p),
                     ),
+                    subtitle: Text(
+                      'Cada evento es distinto: pide una cotización con tu '
+                      'fecha y detalles y ${artist.name} te responde con su '
+                      'precio.',
+                    ),
+                    onTap: () => _book(context),
                   ),
+                ),
                 const _SectionTitle('Horario'),
                 if (artist.weeklyHours.isEmpty)
                   const Text('Este artista aún no ha publicado su horario.'),
@@ -251,15 +246,9 @@ class ArtistDetailScreen extends StatelessWidget {
                     ),
                 const _SectionTitle('Condiciones'),
                 Text(
-                  [
-                    if (artist.packages.any((p) => p.paidInApp))
-                      'Paquetes de actividades: se paga el total por la app '
-                          'al reservar.',
-                    if (artist.packages.any((p) => !p.paidInApp))
-                      'Por la app solo se reserva la fecha; el pago se '
-                          'arregla directo con el artista.',
-                    artist.conditions,
-                  ].join(' '),
+                  'Por la app no se paga nada: el precio se acuerda con el '
+                  'artista y el pago se arregla directo con él. '
+                  '${artist.conditions}',
                 ),
                 const _SectionTitle('Reseñas'),
                 if (artist.reviews == 0)
@@ -368,37 +357,27 @@ class ArtistDetailScreen extends StatelessWidget {
                 padding: const EdgeInsets.all(16),
                 child: Row(
                   children: [
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('desde'),
-                        Text(
-                          money(artist.minPrice),
-                          style: theme.textTheme.titleLarge?.copyWith(
-                            color: isFuturista(context) || isClaro(context)
-                                ? accent
-                                : null,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(width: 12),
                     IconButton.outlined(
-                      tooltip: 'Enviar mensaje',
+                      tooltip: 'Enviar mensaje en la app',
                       icon: const Icon(Icons.chat_bubble_outline),
                       onPressed: AppScope.of(context).account == null
                           ? null
                           : () => chatWithArtist(context, artist),
                     ),
+                    if (artist.hasWhatsapp) ...[
+                      const SizedBox(width: 8),
+                      WhatsAppButton(
+                        artist: artist,
+                        compact: true,
+                        message: quoteWhatsappText(artist: artist),
+                      ),
+                    ],
                     const SizedBox(width: 8),
                     Expanded(
                       child: FilledButton.icon(
-                        onPressed: artist.packages.isEmpty
-                            ? null
-                            : () => _book(context, null),
-                        icon: const Icon(Icons.event_available),
-                        label: const Text('Reservar'),
+                        onPressed: () => _book(context),
+                        icon: const Icon(Icons.request_quote),
+                        label: const Text('Pedir cotización'),
                         style: FilledButton.styleFrom(
                           minimumSize: const Size.fromHeight(52),
                         ),
@@ -411,19 +390,15 @@ class ArtistDetailScreen extends StatelessWidget {
     );
   }
 
-  void _book(BuildContext context, PricePackage? p) {
+  void _book(BuildContext context) {
     if (preview || AppScope.of(context).account?.role == UserRole.artista) {
       return;
     }
     Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => BookingScreen(artist: artist, initialPackage: p),
-      ),
+      MaterialPageRoute(builder: (_) => QuoteRequestScreen(artist: artist)),
     );
   }
 }
-
-String _hours(double h) => h == h.roundToDouble() ? '${h.toInt()} h' : '$h h';
 
 class _SectionTitle extends StatelessWidget {
   const _SectionTitle(this.text);

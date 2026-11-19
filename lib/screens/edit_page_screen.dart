@@ -51,10 +51,22 @@ class _EditPageScreenState extends State<EditPageScreen> {
   late final _bio = TextEditingController(text: _me.bio);
   late final _genres = TextEditingController(text: _me.genres.join(', '));
   late final _conditions = TextEditingController(text: _me.conditions);
+  late final _whatsapp = TextEditingController(text: _me.whatsapp);
+  late final _priceFrom = TextEditingController(
+    text: _me.priceFrom?.toStringAsFixed(0) ?? '',
+  );
 
   @override
   void dispose() {
-    for (final c in [_name, _tagline, _bio, _genres, _conditions]) {
+    for (final c in [
+      _name,
+      _tagline,
+      _bio,
+      _genres,
+      _conditions,
+      _whatsapp,
+      _priceFrom,
+    ]) {
       c.dispose();
     }
     super.dispose();
@@ -97,6 +109,8 @@ class _EditPageScreenState extends State<EditPageScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
         children: [
+          ProfileSwitcher(state: _state),
+          const SizedBox(height: 12),
           // Portada y foto de perfil, como se verán en la página.
           SizedBox(
             height: 200,
@@ -261,12 +275,47 @@ class _EditPageScreenState extends State<EditPageScreen> {
             ],
           ),
           const SizedBox(height: 24),
-          Text('Condiciones de reserva', style: theme.textTheme.titleMedium),
+          Text('Precio y contacto', style: theme.textTheme.titleMedium),
           const SizedBox(height: 4),
           const Text(
-            'Los clientes reservan la fecha por la app y te pagan directo a '
-            'ti. Tarima no cobra nada de las reservas.',
+            'No tienes que fijar precios: cada cliente te pide cotización '
+            'con su fecha y detalles, y tú le respondes con tu precio. '
+            'Tarima no cobra nada de las reservas.',
           ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _priceFrom,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'Precio desde (opcional)',
+              helperText:
+                  'Si lo pones, los clientes ven "Desde \$…". Si no, ven '
+                  '"Precio a cotizar".',
+              prefixText: r'$ ',
+              border: OutlineInputBorder(),
+            ),
+            onChanged: (v) {
+              final n = double.tryParse(v.trim());
+              _update(() => _me.priceFrom = n != null && n > 0 ? n : null);
+            },
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _whatsapp,
+            keyboardType: TextInputType.phone,
+            decoration: const InputDecoration(
+              labelText: 'WhatsApp (opcional)',
+              hintText: '787 555 1234',
+              helperText:
+                  'Los clientes te escriben aquí para preguntar tu precio. '
+                  'Se ve en tu página.',
+              prefixIcon: Icon(Icons.chat_rounded, color: whatsappGreen),
+              border: OutlineInputBorder(),
+            ),
+            onChanged: (v) => _update(() => _me.whatsapp = v.trim()),
+          ),
+          const SizedBox(height: 24),
+          Text('Condiciones', style: theme.textTheme.titleMedium),
           const SizedBox(height: 8),
           TextField(
             controller: _conditions,
@@ -347,8 +396,184 @@ class _EditPageScreenState extends State<EditPageScreen> {
                 ),
             ],
           ),
+          if (_state.isMine(_me) && _me != _state.account?.artist) ...[
+            const SizedBox(height: 32),
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: theme.colorScheme.error,
+              ),
+              icon: const Icon(Icons.delete_outline),
+              label: Text('Borrar el perfil ${_me.name}'),
+              onPressed: _deleteProfile,
+            ),
+          ],
         ],
       ),
     );
   }
+
+  Future<void> _deleteProfile() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('¿Borrar ${_me.name}?'),
+        content: const Text(
+          'El perfil deja de salir en la app. Tus otros perfiles y tu '
+          'membresía siguen igual.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Borrar'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final error = await _state.deleteProfile(_me);
+    messenger.showSnackBar(SnackBar(content: Text(error ?? 'Perfil borrado.')));
+  }
+}
+
+/// Perfiles de la cuenta (solista, agrupación, músico independiente…): se
+/// escoge cuál editar o se crea otro. Cada uno sale aparte en Explorar.
+class ProfileSwitcher extends StatelessWidget {
+  const ProfileSwitcher({super.key, required this.state});
+
+  final AppState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final profiles = state.myProfiles;
+    if (profiles.isEmpty) return const SizedBox.shrink();
+    final current = state.myArtistProfile;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              profiles.length > 1 ? 'Tus perfiles' : 'Tu perfil',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Puedes tener varios perfiles (por ejemplo solista y '
+              'agrupación). Cada uno sale aparte en la búsqueda y tu '
+              'membresía de \$${subscriptionPrice.toStringAsFixed(0)} al mes '
+              'los cubre todos.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final p in profiles)
+                  ChoiceChip(
+                    avatar: Icon(p.category.icon, size: 18),
+                    label: Text(p.name.isEmpty ? 'Sin nombre' : p.name),
+                    selected: p == current,
+                    onSelected: (_) => state.switchProfile(p),
+                  ),
+                ActionChip(
+                  avatar: const Icon(Icons.add, size: 18),
+                  label: const Text('Crear otro perfil'),
+                  onPressed: () => showCreateProfile(context, state),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Pide el nombre y el tipo del perfil nuevo y lo crea.
+Future<void> showCreateProfile(BuildContext context, AppState state) async {
+  final name = TextEditingController();
+  var category = ArtistCategory.agrupacion;
+  var instruments = <String>[];
+  final formKey = GlobalKey<FormState>();
+  final created = await showModalBottomSheet<bool>(
+    context: context,
+    isScrollControlled: true,
+    builder: (ctx) => StatefulBuilder(
+      builder: (ctx, setSheet) => Padding(
+        padding: EdgeInsets.fromLTRB(
+          16,
+          16,
+          16,
+          MediaQuery.of(ctx).viewInsets.bottom + 16,
+        ),
+        child: Form(
+          key: formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Perfil nuevo', style: Theme.of(ctx).textTheme.titleLarge),
+                const SizedBox(height: 4),
+                const Text(
+                  'Sale aparte en la búsqueda, con su propia página. Usa tu '
+                  'mismo pueblo, horario y WhatsApp; los puedes cambiar '
+                  'después.',
+                ),
+                const SizedBox(height: 12),
+                Text('¿Qué tipo?', style: Theme.of(ctx).textTheme.titleMedium),
+                CategoryPicker(
+                  value: category,
+                  onChanged: (c) => setSheet(() => category = c),
+                ),
+                if (category.hasInstruments) ...[
+                  const SizedBox(height: 8),
+                  InstrumentPicker(
+                    selected: instruments,
+                    onChanged: (l) => setSheet(() => instruments = l),
+                  ),
+                ],
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: name,
+                  decoration: const InputDecoration(
+                    labelText: 'Nombre artístico de este perfil',
+                    hintText: 'Ej. Sofía Rivera Trío',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (v) =>
+                      (v ?? '').trim().isEmpty ? 'Escribe el nombre' : null,
+                ),
+                const SizedBox(height: 12),
+                FilledButton(
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(48),
+                  ),
+                  onPressed: () {
+                    if (formKey.currentState!.validate()) {
+                      Navigator.pop(ctx, true);
+                    }
+                  },
+                  child: const Text('Crear perfil'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+  if (created != true) return;
+  state.createProfile(
+    name: name.text.trim(),
+    category: category,
+    instruments: instruments,
+  );
 }

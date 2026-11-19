@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -7,22 +5,23 @@ import '../app_state.dart';
 import '../availability.dart';
 import '../models.dart';
 import '../widgets/common.dart';
-import 'payment_screen.dart';
 
-class BookingScreen extends StatefulWidget {
-  const BookingScreen({super.key, required this.artist, this.initialPackage});
+/// El cliente pide cotización: cuenta qué evento es, la fecha, la hora, el
+/// lugar y los detalles. El artista responde con su precio y el cliente lo
+/// acepta para reservar. Nada se paga por la app.
+class QuoteRequestScreen extends StatefulWidget {
+  const QuoteRequestScreen({super.key, required this.artist});
 
   final Artist artist;
-  final PricePackage? initialPackage;
 
   @override
-  State<BookingScreen> createState() => _BookingScreenState();
+  State<QuoteRequestScreen> createState() => _QuoteRequestScreenState();
 }
 
-class _BookingScreenState extends State<BookingScreen> {
+class _QuoteRequestScreenState extends State<QuoteRequestScreen> {
   final _form = GlobalKey<FormState>();
-  late PricePackage _package = widget.initialPackage ?? _defaultPackage();
   late EventType _eventType = _defaultEventType();
+  double _hours = 2;
   DateTime? _date;
   TimeOfDay? _time;
   bool _accepted = false;
@@ -35,48 +34,23 @@ class _BookingScreenState extends State<BookingScreen> {
         ? [
             _account!.businessName,
             _account.address,
+            _account.town,
           ].where((s) => s.isNotEmpty).join(', ')
-        : '',
+        : _account?.town ?? '',
   );
   late final _name = TextEditingController(text: _account?.displayName);
   final _notes = TextEditingController();
 
-  /// Tarifa de servicio de la plataforma. El servidor de pagos usa la misma
-  /// (FEE_RATE en Vercel) y es el que decide el monto final.
-  static const _feeRate = 0.10;
+  static const _durations = [1.0, 2.0, 3.0, 4.0, 5.0];
 
-  /// Un restaurante empieza con un paquete de restaurante, si el artista
-  /// tiene uno.
-  PricePackage _defaultPackage() {
-    final packages = widget.artist.packages;
-    if (AppScope.of(context).account?.clientType == ClientType.restaurante) {
-      return packages
-              .where((p) => p.kind == PackageKind.restaurante)
-              .firstOrNull ??
-          packages.first;
-    }
-    return packages.first;
-  }
-
-  /// No se paga por la app, solo la reserva (todas en el MVP).
-  bool get _noDeposit => !_package.paidInApp;
-
-  /// Tipos de evento que van con el paquete: los de restaurante son para
-  /// restaurantes; los de actividades, para todo lo demás.
   List<EventType> get _eventTypes {
-    if (_package.kind == PackageKind.restaurante) {
-      return const [EventType.restaurante];
-    }
-    final types = widget.artist.eventTypes
-        .where((e) => e != EventType.restaurante)
-        .toList();
-    return types.isEmpty ? const [EventType.actividad] : types;
+    final types = widget.artist.eventTypes.toList();
+    return types.isEmpty ? EventType.values : types;
   }
 
   EventType _defaultEventType() {
     final types = _eventTypes;
-    final account = AppScope.of(context).account;
-    final preferred = switch (account?.clientType) {
+    final preferred = switch (AppScope.of(context).account?.clientType) {
       ClientType.restaurante => EventType.restaurante,
       ClientType.agrupacion => EventType.conAgrupacion,
       _ => null,
@@ -96,51 +70,26 @@ class _BookingScreenState extends State<BookingScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final artist = widget.artist;
-    // Restaurante: no se cobra nada por la app, ni la tarifa de servicio.
-    // Actividades: se paga el total al reservar (no hay depósito).
-    final noDeposit = _noDeposit;
-    final total = noDeposit
-        ? _package.price
-        : ((_package.price * (1 + _feeRate)) * 100).round() / 100;
-    final fee = total - _package.price;
-    final dueNow = noDeposit ? 0.0 : total;
     final dateFmt = DateFormat.yMMMMEEEEd('es');
 
     return Scaffold(
-      appBar: AppBar(title: Text('Reservar a ${artist.name}')),
+      appBar: AppBar(title: Text('Cotizar con ${artist.name}')),
       body: Form(
         key: _form,
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            _StepTitle(1, 'Escoge el paquete'),
-            RadioGroup<PricePackage>(
-              groupValue: _package,
-              onChanged: (v) => setState(() {
-                _package = v!;
-                if (!_eventTypes.contains(_eventType)) {
-                  _eventType = _eventTypes.first;
-                }
-                // Un paquete más largo puede no caber en la hora elegida.
-                if (_date != null && !_slots(_date!).contains(_time)) {
-                  _time = null;
-                }
-              }),
-              child: Column(
-                children: [
-                  for (final p in artist.packages)
-                    RadioListTile<PricePackage>(
-                      value: p,
-                      title: Text(p.name),
-                      subtitle: Text('${p.hours} h · ${p.kind.label}'),
-                      secondary: Text(
-                        money(p.price),
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                ],
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Text(
+                  'Cuéntale a ${artist.name} de tu evento. Te responde con '
+                  'su precio aquí en la app y, si te gusta, lo aceptas para '
+                  'reservar la fecha. No pagas nada por la app.',
+                ),
               ),
             ),
+            const _StepTitle(1, '¿Qué evento es?'),
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -154,7 +103,28 @@ class _BookingScreenState extends State<BookingScreen> {
                   ),
               ],
             ),
-            _StepTitle(2, 'Fecha, hora y lugar'),
+            const SizedBox(height: 12),
+            Text('¿Cuántas horas?', style: theme.textTheme.titleSmall),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final h in _durations)
+                  ChoiceChip(
+                    label: Text('${h.toInt()} h'),
+                    selected: _hours == h,
+                    onSelected: (_) => setState(() {
+                      _hours = h;
+                      // Un evento más largo puede no caber en la hora elegida.
+                      if (_date != null && !_slots(_date!).contains(_time)) {
+                        _time = null;
+                      }
+                    }),
+                  ),
+              ],
+            ),
+            const _StepTitle(2, 'Fecha, hora y lugar'),
             Text(
               'Solo ves los días y horas en que ${artist.name} está disponible.',
               style: theme.textTheme.bodySmall,
@@ -197,8 +167,8 @@ class _BookingScreenState extends State<BookingScreen> {
             TextFormField(
               controller: _venue,
               decoration: const InputDecoration(
-                labelText: 'Lugar del evento',
-                hintText: 'Ej. Restaurante El Patio, San Juan',
+                labelText: 'Lugar y pueblo del evento',
+                hintText: 'Ej. Salón Los Robles, Caguas',
                 prefixIcon: Icon(Icons.place),
                 border: OutlineInputBorder(),
               ),
@@ -219,19 +189,18 @@ class _BookingScreenState extends State<BookingScreen> {
               controller: _notes,
               maxLines: 3,
               decoration: const InputDecoration(
-                labelText: 'Notas para el artista (opcional)',
-                hintText: 'Canciones especiales, número de invitados…',
+                labelText: 'Detalles del evento (opcional)',
+                hintText:
+                    'Número de invitados, canciones especiales, '
+                    'si hay sonido en el lugar…',
                 border: OutlineInputBorder(),
               ),
             ),
-            _StepTitle(3, 'Condiciones del artista'),
+            const _StepTitle(3, 'Condiciones del artista'),
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [Text(artist.conditions)],
-                ),
+                child: Text(artist.conditions),
               ),
             ),
             CheckboxListTile(
@@ -241,50 +210,19 @@ class _BookingScreenState extends State<BookingScreen> {
               contentPadding: EdgeInsets.zero,
               title: const Text('Acepto las condiciones del artista'),
             ),
-            if (noDeposit) ...[
-              _StepTitle(4, 'Sin pago por la app'),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      _row('Precio del artista', money(_package.price)),
-                      const Divider(),
-                      _row('A pagar ahora', money(0), bold: true),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
+            if (artist.hasWhatsapp) ...[
+              const SizedBox(height: 4),
               Text(
-                'No pagas nada por la app: reservas la fecha y el pago se '
-                'arregla directo con ${artist.name}.',
+                '¿Prefieres hablarlo primero? Escríbele por WhatsApp y luego '
+                'envía la solicitud con lo que acuerden.',
                 style: theme.textTheme.bodySmall,
               ),
-            ] else ...[
-              _StepTitle(4, 'Pago'),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      _row('Precio del artista', money(_package.price)),
-                      _row(
-                        'Tarifa de servicio (${(_feeRate * 100).round()}%)',
-                        money(fee),
-                      ),
-                      const Divider(),
-                      _row('A pagar ahora', money(dueNow), bold: true),
-                    ],
-                  ),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: WhatsAppButton(
+                  artist: artist,
+                  message: _whatsappMessage(),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Pagas con tarjeta o ATH Móvil. Con tarjeta no se cobra nada '
-                'hasta que ${artist.name} acepte; con ATH Móvil, si rechaza, te '
-                'devolvemos el dinero.',
-                style: theme.textTheme.bodySmall,
               ),
             ],
           ],
@@ -297,40 +235,32 @@ class _BookingScreenState extends State<BookingScreen> {
             style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(52),
             ),
-            icon: Icon(noDeposit ? Icons.send : Icons.lock),
-            onPressed: _sending
-                ? null
-                : () => _continueToPayment(total, dueNow),
-            label: Text(
-              noDeposit
-                  ? 'Enviar solicitud'
-                  : 'Continuar al pago · ${money(dueNow)}',
-            ),
+            icon: const Icon(Icons.send),
+            onPressed: _sending ? null : _send,
+            label: const Text('Pedir cotización'),
           ),
         ),
       ),
     );
   }
 
-  Widget _row(String l, String v, {bool bold = false}) {
-    final style = bold
-        ? const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)
-        : null;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        children: [
-          Expanded(child: Text(l, style: style)),
-          Text(v, style: style),
-        ],
-      ),
+  /// Mensaje para WhatsApp con lo que el cliente ya escogió.
+  String _whatsappMessage() {
+    final date = _date == null
+        ? ''
+        : ' el ${DateFormat.yMMMMEEEEd('es').format(_date!)}';
+    return quoteWhatsappText(
+      artist: widget.artist,
+      eventType: _eventType,
+      when: date,
+      place: _venue.text.trim(),
     );
   }
 
   String? _required(String? v) =>
       (v == null || v.trim().isEmpty) ? 'Campo requerido' : null;
 
-  int get _duration => (_package.hours * 60).round();
+  int get _duration => (_hours * 60).round();
 
   List<TimeOfDay> _slots(DateTime day) => availableStarts(
     artist: widget.artist,
@@ -341,7 +271,7 @@ class _BookingScreenState extends State<BookingScreen> {
 
   Future<void> _pickDate() async {
     final today = dayOnly(DateTime.now());
-    final last = today.add(const Duration(days: 180));
+    final last = today.add(const Duration(days: 365));
     bool available(DateTime d) => _slots(d).isNotEmpty;
 
     var first = _date;
@@ -351,8 +281,9 @@ class _BookingScreenState extends State<BookingScreen> {
     }
     if (first == null) {
       return _snack(
-        '${widget.artist.name} no tiene fechas disponibles en los próximos '
-        '6 meses para este paquete.',
+        '${widget.artist.name} no tiene fechas disponibles en el próximo año '
+        'para un evento de ${_hours.toInt()} horas. Escríbele para '
+        'preguntarle.',
       );
     }
     final d = await showDatePicker(
@@ -374,7 +305,7 @@ class _BookingScreenState extends State<BookingScreen> {
   void _snack(String msg) =>
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
 
-  Future<void> _continueToPayment(double total, double dueNow) async {
+  Future<void> _send() async {
     if (!_form.currentState!.validate()) return;
     if (_date == null) return _snack('Elige la fecha del evento');
     if (_time == null || !_slots(_date!).contains(_time)) {
@@ -387,95 +318,36 @@ class _BookingScreenState extends State<BookingScreen> {
     final booking = Booking(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       artist: widget.artist,
-      package: _package.name,
       eventType: _eventType,
       date: _date!,
       time: _time!,
-      hours: _package.hours,
+      hours: _hours,
       venue: _venue.text.trim(),
       clientName: _name.text.trim(),
       clientType: _account?.clientType ?? ClientType.privado,
       clientEmail: _account?.email ?? '',
       clientUid: state.uid,
       notes: _notes.text.trim(),
-      total: total,
-      amountCharged: dueNow,
+      total: 0,
+      amountCharged: 0,
       payDeposit: false,
-      noDeposit: _noDeposit,
-      paymentMethod: _noDeposit ? PaymentMethod.ninguno : PaymentMethod.tarjeta,
+      noDeposit: true,
+      paymentMethod: PaymentMethod.ninguno,
       cardLast4: '',
     );
-
-    if (_noDeposit) {
-      // Sin pago por la app: solo la solicitud.
-      String? error;
-      if (state.serverPayments) {
-        setState(() => _sending = true);
-        error = await state.bookWithoutDeposit(booking);
-        if (!mounted) return;
-        setState(() => _sending = false);
-        if (error == null) state.notifyArtist(booking);
-      } else {
-        state.addBooking(booking);
-      }
-      if (error != null) return _snack(error);
-      await showPaidDialog(context, booking);
-      if (mounted) Navigator.of(context).popUntil((r) => r.isFirst);
-      return;
-    }
-
-    // Con cobro real la reserva se guarda primero (sin pagar) y el servidor
-    // la marca como pagada.
-    final live = state.serverPayments;
-    if (live) {
-      try {
-        await state.createUnpaidBooking(booking);
-      } catch (_) {
-        return _snack('No se pudo guardar la reserva. Intenta otra vez.');
-      }
-      if (!mounted) return;
-    }
-    final paid = await Navigator.of(context).push<PaymentResult>(
-      MaterialPageRoute(
-        builder: (_) => PaymentScreen(
-          amount: dueNow,
-          concept: '${_package.name} · ${widget.artist.name}',
-          booking: live ? booking : null,
-          phone: _account?.phone ?? '',
-        ),
-      ),
-    );
-    if (paid == null) {
-      // Se fue sin pagar: la reserva no sigue.
-      if (live) unawaited(state.cancelBooking(booking));
-      return;
-    }
+    setState(() => _sending = true);
+    final error = await state.requestQuote(booking);
     if (!mounted) return;
-    booking
-      ..paymentMethod = paid.method
-      ..cardLast4 = paid.last4;
-    if (live) {
-      state.notifyArtist(booking);
-    } else {
-      state.addBooking(booking);
-    }
-    await showPaidDialog(context, booking);
+    setState(() => _sending = false);
+    if (error != null) return _snack(error);
+    await showRequestSentDialog(context, booking);
     if (mounted) Navigator.of(context).popUntil((r) => r.isFirst);
   }
 }
 
-/// Confirma que la solicitud se envió y cómo quedó el pago.
-Future<void> showPaidDialog(BuildContext context, Booking b) {
-  final amount = money(b.amountCharged);
+/// Confirma que la solicitud de cotización se envió.
+Future<void> showRequestSentDialog(BuildContext context, Booking b) {
   final name = b.artist.name;
-  final how = b.noDeposit
-      ? 'No pagaste nada por la app. El pago '
-            'se arregla directo con $name.'
-      : b.paymentMethod == PaymentMethod.ath
-      ? 'Pagaste $amount con ATH Móvil. Si $name no acepta, te devolvemos el '
-            'dinero.'
-      : 'Retuvimos $amount en tu tarjeta${b.cardLast4.isEmpty ? '' : ' terminada en ${b.cardLast4}'}. '
-            'Se cobra solo si $name acepta.';
   return showDialog<void>(
     context: context,
     barrierDismissible: false,
@@ -483,8 +355,10 @@ Future<void> showPaidDialog(BuildContext context, Booking b) {
       icon: const Icon(Icons.check_circle, color: Colors.green, size: 48),
       title: const Text('¡Solicitud enviada!'),
       content: Text(
-        '$how Le avisamos al artista por notificación en su teléfono y por '
-        'email. Puedes seguirla en "Mis reservas".',
+        'Le avisamos a $name por notificación y por email. Cuando te envíe '
+        'su precio lo verás en "Reservas" y ahí lo aceptas para reservar la '
+        'fecha. No pagas nada por la app: el pago se arregla directo con '
+        '$name.',
       ),
       actions: [
         FilledButton(

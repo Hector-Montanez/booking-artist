@@ -83,48 +83,16 @@ extension EventTypeInfo on EventType {
 /// (IN_APP_PAYMENTS en Vercel).
 const inAppPayments = false;
 
-/// Para qué es un paquete: restaurantes o actividades (bodas, cumpleaños…).
-/// Si se encienden los pagos, los de actividades se pagan por la app; los de
-/// restaurante siempre son solo la reserva.
-enum PackageKind { actividad, restaurante }
-
-extension PackageKindInfo on PackageKind {
-  String get label => switch (this) {
-    PackageKind.actividad => 'Actividad o evento',
-    PackageKind.restaurante => 'Restaurante',
-  };
-
-  String get description => switch (this) {
-    PackageKind.actividad => 'Bodas, cumpleaños y actividades.',
-    PackageKind.restaurante => 'Para restaurantes y negocios.',
-  };
-
-  IconData get icon => switch (this) {
-    PackageKind.actividad => Icons.celebration,
-    PackageKind.restaurante => Icons.restaurant,
-  };
+/// Deja solo los dígitos de un teléfono para un enlace de WhatsApp. Los
+/// números de Puerto Rico (10 dígitos) llevan el 1 de delante.
+String whatsappDigits(String phone) {
+  final d = phone.replaceAll(RegExp(r'\D'), '');
+  return d.length == 10 ? '1$d' : d;
 }
 
-/// Paquete con precio fijado por el propio artista.
-class PricePackage {
-  PricePackage({
-    required this.name,
-    required this.price,
-    required this.hours,
-    this.description = '',
-    this.kind = PackageKind.actividad,
-  });
-
-  String name;
-  double price;
-  double hours;
-  String description;
-  PackageKind kind;
-
-  /// Se paga por la app al reservar (solo actividades, y solo con los pagos
-  /// encendidos).
-  bool get paidInApp => inAppPayments && kind == PackageKind.actividad;
-}
+/// Dueño (cuenta) de una página de artista. La primera página de cada
+/// cuenta tiene el id de la cuenta; las demás, `<cuenta>__<número>`.
+String ownerOfArtistId(String id) => id.split('__').first;
 
 /// Reseña que deja un cliente después de un evento confirmado. Una por
 /// reserva (su id es el de la reserva).
@@ -258,7 +226,6 @@ class Artist {
     required double rating,
     required int reviews,
     required this.color,
-    required this.packages,
     required this.links,
     required this.eventTypes,
     this.verified = false,
@@ -272,13 +239,30 @@ class Artist {
     this.bufferMinutes = 60,
     this.createdAt,
     this.subscription,
-  }) : baseRating = rating,
+    this.priceFrom,
+    this.whatsapp = '',
+    String? ownerUid,
+  }) : ownerUid = ownerUid ?? ownerOfArtistId(id),
+       baseRating = rating,
        baseReviews = reviews,
        instruments = instruments ?? [],
        weeklyHours = weeklyHours ?? defaultWeeklyHours();
 
-  /// En la nube es el id de la cuenta del artista.
+  /// En la nube, la primera página de una cuenta tiene el id de la cuenta;
+  /// las demás páginas (perfiles) son `<cuenta>__<número>`.
   String id;
+
+  /// Cuenta dueña de esta página. Una cuenta puede tener varias páginas
+  /// (solista, agrupación, músico independiente…) y una sola membresía.
+  String ownerUid;
+
+  /// Precio de referencia opcional ("Desde \$X"). Null si el artista
+  /// prefiere no mostrar precio: el precio se acuerda en cada cotización.
+  double? priceFrom;
+
+  /// Número de WhatsApp donde los clientes le escriben. Vacío si no quiere
+  /// que le escriban por WhatsApp.
+  String whatsapp;
   String name;
   ArtistCategory category;
   List<String> genres;
@@ -326,12 +310,11 @@ class Artist {
   Subscription get effectiveSubscription =>
       subscription ?? Subscription(status: 'sinTarjeta', trialEnd: trialEnd);
 
-  /// Aparece en Explorar: tiene al menos un precio y está suscrito o en su
-  /// mes gratis.
-  bool get listed => packages.isNotEmpty && effectiveSubscription.visible;
+  /// Aparece en Explorar: tiene nombre y la membresía de su cuenta está
+  /// activa (o en su mes gratis). Ya no hace falta poner precios.
+  bool get listed => name.isNotEmpty && effectiveSubscription.visible;
 
   Color color;
-  final List<PricePackage> packages;
   final List<MediaLink> links;
   Set<EventType> eventTypes;
   final bool verified;
@@ -348,7 +331,7 @@ class Artist {
   /// Instrumentos que toca (solistas y músicos independientes).
   List<String> instruments;
 
-  /// Condiciones que el cliente acepta antes de pagar.
+  /// Condiciones que el cliente acepta al pedir una cotización.
   String conditions;
 
   /// Correo donde el artista recibe avisos de nuevas solicitudes.
@@ -374,9 +357,8 @@ class Artist {
   Uint8List? cover;
   final List<Uint8List> gallery = [];
 
-  double get minPrice => packages.isEmpty
-      ? 0
-      : packages.map((p) => p.price).reduce((a, b) => a < b ? a : b);
+  /// Le pueden escribir por WhatsApp.
+  bool get hasWhatsapp => whatsappDigits(whatsapp).length >= 10;
 
   String get initials => name
       .split(' ')
@@ -420,11 +402,15 @@ const defaultConditions =
     'Después de eso el pago no se devuelve. '
     'El cliente provee electricidad y un espacio techado para tocar.';
 
-enum BookingStatus { pendiente, confirmada, rechazada, cancelada }
+/// pendiente: el cliente pidió cotización (o reservó, en las reservas
+/// viejas con precio fijo). cotizada: el artista le envió un precio y falta
+/// que el cliente lo acepte. confirmada: la fecha quedó reservada.
+enum BookingStatus { pendiente, cotizada, confirmada, rechazada, cancelada }
 
 extension BookingStatusInfo on BookingStatus {
   String get label => switch (this) {
     BookingStatus.pendiente => 'Esperando respuesta',
+    BookingStatus.cotizada => 'Precio propuesto',
     BookingStatus.confirmada => 'Confirmada',
     BookingStatus.rechazada => 'Rechazada',
     BookingStatus.cancelada => 'Cancelada',
@@ -432,6 +418,7 @@ extension BookingStatusInfo on BookingStatus {
 
   Color get color => switch (this) {
     BookingStatus.pendiente => const Color(0xFFF9A825),
+    BookingStatus.cotizada => const Color(0xFF1E88E5),
     BookingStatus.confirmada => const Color(0xFF2E7D32),
     BookingStatus.rechazada => const Color(0xFFC62828),
     BookingStatus.cancelada => const Color(0xFF9E9E9E),
@@ -486,11 +473,14 @@ extension PaymentMethodInfo on PaymentMethod {
   };
 }
 
+/// Valor de [Booking.package] en las solicitudes de cotización.
+const quotePackage = 'Cotización';
+
 class Booking {
   Booking({
     required this.id,
     required this.artist,
-    required this.package,
+    this.package = quotePackage,
     required this.eventType,
     required this.date,
     required this.time,
@@ -509,10 +499,15 @@ class Booking {
     this.hours = 2,
     this.clientUid = '',
     this.noDeposit = false,
+    this.quotePrice,
+    this.quoteNote = '',
   });
 
   final String id;
   final Artist artist;
+
+  /// Nombre del paquete en las reservas viejas; en las nuevas,
+  /// [quotePackage].
   final String package;
   final EventType eventType;
   final DateTime date;
@@ -537,7 +532,7 @@ class Booking {
 
   /// Se reservó sin pagar nada por la app;
   /// el pago se arregla directo con el artista.
-  final bool noDeposit;
+  bool noDeposit;
 
   /// Últimos 4 dígitos de la tarjeta, o del teléfono de ATH Móvil.
   String cardLast4;
@@ -554,16 +549,32 @@ class Booking {
     PaymentMethod.ninguno => 'Pago directo al artista',
   };
 
-  /// Duración del paquete reservado.
+  /// Precio que propuso el artista (o que acordaron). Null mientras el
+  /// artista no ha respondido.
+  double? quotePrice;
+
+  /// Lo que el artista explica con su precio (qué incluye, etc.).
+  String quoteNote;
+
+  /// Es una solicitud de cotización (no una reserva vieja con precio fijo).
+  bool get isQuote => package == quotePackage;
+
+  /// Esperando que alguien responda: el artista (pendiente) o el cliente
+  /// (cotizada).
+  bool get open =>
+      status == BookingStatus.pendiente || status == BookingStatus.cotizada;
+
+  /// Horas que dura el evento.
   final double hours;
 
   DateTime get start =>
       DateTime(date.year, date.month, date.day, time.hour, time.minute);
   DateTime get end => start.add(Duration(minutes: (hours * 60).round()));
 
-  /// Una reserva pendiente o confirmada ocupa ese horario del artista.
-  bool get blocksSchedule =>
-      status == BookingStatus.pendiente || status == BookingStatus.confirmada;
+  /// Solo una reserva confirmada ocupa el horario del artista. Las
+  /// solicitudes de cotización no lo apartan: varios clientes pueden pedir
+  /// precio para la misma fecha y el artista decide.
+  bool get blocksSchedule => status == BookingStatus.confirmada;
 
   double get balance => total - amountCharged;
 
@@ -605,11 +616,12 @@ class Account {
     this.businessName = '',
     this.address = '',
     this.town = '',
-    this.artist,
+    Artist? artist,
+    List<Artist>? profiles,
     this.password = '',
     this.smsOptIn = false,
     this.theme,
-  });
+  }) : profiles = profiles ?? [?artist];
 
   final UserRole role;
   String name;
@@ -631,8 +643,13 @@ class Account {
   /// cuenta es de antes de poder escogerlo.
   String? theme;
 
-  /// Página pública del artista, si la cuenta es de artista.
-  final Artist? artist;
+  /// Páginas públicas (perfiles) del artista: solista, agrupación, músico
+  /// independiente… Todas las cubre la misma membresía. Vacía si la cuenta
+  /// es de cliente.
+  final List<Artist> profiles;
+
+  /// Primera página del artista (la que se creó con la cuenta).
+  Artist? get artist => profiles.firstOrNull;
 
   /// Solo para el prototipo. En la versión real la contraseña la maneja el
   /// servicio de inicio de sesión y nunca se guarda en la app.

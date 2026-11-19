@@ -14,7 +14,6 @@ Artist _artist() => Artist(
   rating: 0,
   reviews: 0,
   color: Colors.purple,
-  packages: [PricePackage(name: 'Show', price: 100, hours: 2)],
   links: [],
   eventTypes: {EventType.boda},
   weeklyHours: {6: const DayHours(18 * 60, 24 * 60)}, // sábados 6 p. m. a 12
@@ -91,6 +90,44 @@ void main() {
       now: now,
     );
     expect(freed.length, 11);
+
+    // Una solicitud de cotización todavía no aparta la hora.
+    final asked = availableStarts(
+      artist: a,
+      bookings: [_booked(a, saturday, 20, BookingStatus.pendiente)],
+      day: saturday,
+      durationMinutes: 60,
+      now: now,
+    );
+    expect(asked.length, 11);
+  });
+
+  test('una reserva de otro perfil de la misma persona también ocupa', () {
+    final solista = _artist();
+    final trio = Artist(
+      id: 'x__2',
+      name: 'Prueba Trío',
+      category: ArtistCategory.agrupacion,
+      genres: [],
+      bio: '',
+      zone: 'Caguas',
+      distanceKm: 1,
+      rating: 0,
+      reviews: 0,
+      color: Colors.purple,
+      links: [],
+      eventTypes: {EventType.boda},
+      weeklyHours: {6: const DayHours(18 * 60, 24 * 60)},
+    );
+    expect(trio.ownerUid, 'x');
+    final slots = availableStarts(
+      artist: solista,
+      bookings: [_booked(trio, saturday, 20, BookingStatus.confirmada)],
+      day: saturday,
+      durationMinutes: 60,
+      now: now,
+    );
+    expect(fmt(slots), '18:00 23:00');
   });
 
   test('un día libre no tiene horas', () {

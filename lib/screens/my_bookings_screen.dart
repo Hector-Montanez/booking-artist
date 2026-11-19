@@ -3,8 +3,6 @@ import 'package:intl/intl.dart';
 
 import '../app_state.dart';
 import '../models.dart';
-import 'booking_screen.dart';
-import 'payment_screen.dart';
 import '../widgets/common.dart';
 import 'inbox_screen.dart';
 
@@ -24,7 +22,8 @@ class MyBookingsScreen extends StatelessWidget {
               child: Padding(
                 padding: EdgeInsets.all(32),
                 child: Text(
-                  'Aún no tienes reservas.\nExplora artistas y envía tu primera solicitud.',
+                  'Aún no tienes reservas.\nExplora artistas y pídeles '
+                  'cotización para tu evento.',
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -75,19 +74,26 @@ class MyBookingsScreen extends StatelessWidget {
                         Text(b.venue),
                         const SizedBox(height: 4),
                         Text(
-                          b.noDeposit
-                              ? 'El pago se '
-                                    'arregla directo con el artista'
-                              : b.payment == PaymentStatus.porPagar
-                              ? '${money(b.amountCharged)} · ${b.payment.label}'
-                              : '${b.paidWith}: ${money(b.amountCharged)} · '
-                                    '${b.payment.label}',
+                          switch (b.status) {
+                            BookingStatus.pendiente =>
+                              'Esperando que ${b.artist.name} te envíe su '
+                                  'precio.',
+                            BookingStatus.cotizada =>
+                              '${b.artist.name} te propone '
+                                  '${money(b.quotePrice ?? b.total)}.',
+                            _ when b.total > 0 =>
+                              'Precio: ${money(b.total)} · el pago se arregla '
+                                  'directo con el artista',
+                            _ => 'El pago se arregla directo con el artista',
+                          },
+                          style: b.status == BookingStatus.cotizada
+                              ? const TextStyle(fontWeight: FontWeight.bold)
+                              : null,
                         ),
-                        if (b.status == BookingStatus.confirmada &&
-                            b.balance > 0 &&
-                            !b.noDeposit)
+                        if (b.quoteNote.isNotEmpty)
                           Text(
-                            'Resto a pagar el día del evento: ${money(b.balance)}',
+                            b.quoteNote,
+                            style: Theme.of(context).textTheme.bodySmall,
                           ),
                         if (state.reviewFor(b) case final r?)
                           Padding(
@@ -104,20 +110,22 @@ class MyBookingsScreen extends StatelessWidget {
                           alignment: WrapAlignment.end,
                           crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
-                            Padding(
-                              padding: const EdgeInsets.only(right: 8),
-                              child: Text(
-                                'Total: ${money(b.total)}',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
                             IconButton(
                               tooltip: 'Escribir al artista',
                               icon: const Icon(Icons.chat_bubble_outline),
                               onPressed: () =>
                                   chatWithArtist(context, b.artist),
+                            ),
+                            WhatsAppButton(
+                              artist: b.artist,
+                              compact: true,
+                              message: quoteWhatsappText(
+                                artist: b.artist,
+                                eventType: b.eventType,
+                                when:
+                                    ' el ${DateFormat.yMMMMEEEEd('es').format(b.date)}',
+                                place: b.venue,
+                              ),
                             ),
                             if (state.canReview(b))
                               TextButton.icon(
@@ -129,18 +137,21 @@ class MyBookingsScreen extends StatelessWidget {
                                       : 'Editar reseña',
                                 ),
                               ),
-                            if (b.status == BookingStatus.pendiente &&
-                                b.payment == PaymentStatus.porPagar &&
-                                !b.noDeposit)
-                              TextButton(
-                                onPressed: () => _finishPayment(context, b),
-                                child: const Text('Pagar'),
-                              ),
                             if (b.status == BookingStatus.pendiente)
                               TextButton(
                                 onPressed: () => _cancel(context, b),
                                 child: const Text('Cancelar'),
                               ),
+                            if (b.status == BookingStatus.cotizada) ...[
+                              TextButton(
+                                onPressed: () => _cancel(context, b),
+                                child: const Text('No, gracias'),
+                              ),
+                              FilledButton(
+                                onPressed: () => _acceptQuote(context, b),
+                                child: const Text('Aceptar y reservar'),
+                              ),
+                            ],
                           ],
                         ),
                       ],
@@ -155,14 +166,51 @@ class MyBookingsScreen extends StatelessWidget {
 
 Future<void> _cancel(BuildContext context, Booking b) async {
   final messenger = ScaffoldMessenger.of(context);
+  final quoted = b.status == BookingStatus.cotizada;
   final error = await AppScope.of(context).cancelBooking(b);
   messenger.showSnackBar(
     SnackBar(
       content: Text(
         error ??
-            (b.payment == PaymentStatus.reembolsado
-                ? 'Reserva cancelada. Te devolvimos el pago de ATH Móvil.'
-                : 'Reserva cancelada. No se cobró nada.'),
+            (quoted
+                ? 'Listo. Le avisamos a ${b.artist.name} que no aceptaste.'
+                : 'Solicitud cancelada.'),
+      ),
+    ),
+  );
+}
+
+/// El cliente acepta el precio del artista: la fecha queda reservada.
+Future<void> _acceptQuote(BuildContext context, Booking b) async {
+  final state = AppScope.of(context);
+  final messenger = ScaffoldMessenger.of(context);
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: Text('¿Reservar a ${b.artist.name}?'),
+      content: Text(
+        'Aceptas el precio de ${money(b.quotePrice ?? b.total)} y la fecha '
+        'queda reservada. No pagas nada por la app: el pago se arregla '
+        'directo con ${b.artist.name}.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: const Text('Todavía no'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(ctx, true),
+          child: const Text('Aceptar y reservar'),
+        ),
+      ],
+    ),
+  );
+  if (ok != true) return;
+  final error = await state.acceptQuote(b);
+  messenger.showSnackBar(
+    SnackBar(
+      content: Text(
+        error ?? '¡Listo! Tu fecha con ${b.artist.name} quedó reservada.',
       ),
     ),
   );
@@ -230,22 +278,4 @@ Future<void> showReviewSheet(BuildContext context, Booking b) async {
       content: Text(error ?? '¡Gracias! Tu reseña ya se ve en su página.'),
     ),
   );
-}
-
-/// Termina de pagar una reserva que quedó sin pagar.
-Future<void> _finishPayment(BuildContext context, Booking b) async {
-  final state = AppScope.of(context);
-  final paid = await Navigator.of(context).push<PaymentResult>(
-    MaterialPageRoute(
-      builder: (_) => PaymentScreen(
-        amount: b.amountCharged,
-        concept: '${b.package} · ${b.artist.name}',
-        booking: b,
-        phone: state.account?.phone ?? '',
-      ),
-    ),
-  );
-  if (paid == null || !context.mounted) return;
-  state.notifyArtist(b);
-  await showPaidDialog(context, b);
 }
